@@ -1,0 +1,8 @@
+[project]
+name = "ComfyUI-Luori-Sunset"
+version = "1.0.5"
+description = "落日系列：Krea2 与 Z-image 提示词节点合集（霓虹面板外观）"
+dependencies = []
+
+[tool.comfy]
+web = "web"
