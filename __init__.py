@@ -4,6 +4,7 @@ from .nodes_zimage import (
     ZImagePromptLoaderNode,
     ZImageFashionPresetLoaderNode,
 )
+from .nodes_nsfw import SunsetNSPromptSelector
 
 __version__ = "1.0.5"
 
@@ -12,6 +13,7 @@ NODE_CLASS_MAPPINGS = {
     "ZImagePromptGeneratorNode": ZImagePromptGeneratorNode,
     "ZImagePromptLoaderNode": ZImagePromptLoaderNode,
     "ZImageFashionPresetLoaderNode": ZImageFashionPresetLoaderNode,
+    "SunsetNSPromptSelector": SunsetNSPromptSelector,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -19,6 +21,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ZImagePromptGeneratorNode": "✨ 落日-提示词生成器",
     "ZImagePromptLoaderNode": "✨ 落日-提示词抽取器",
     "ZImageFashionPresetLoaderNode": "👗 落日-穿搭预设选择器",
+    "SunsetNSPromptSelector": "落日NS-提示词",
 }
 
 WEB_DIRECTORY = "./web"
