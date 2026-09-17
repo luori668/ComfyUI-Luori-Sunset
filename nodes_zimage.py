@@ -16,6 +16,327 @@ def _uniq(seq):
     return out
 
 
+# ============================================================================
+# 以下常量只服务 ZImagePromptGeneratorNode（✨ 落日-提示词生成器）
+# 作用：把「拍摄风格 / 拍摄类型 / 情趣衣服 / NSFW」收敛成一个统一风格桶，
+#       再让 服装-材质-颜色-丝袜-鞋子-头饰-场景 全部跟着这个桶走，
+#       消除「两套衣服」「类型与服装不搭」这类互相打架的输出。
+# ============================================================================
+
+# 顺序 = 优先级。命中靠关键词包含匹配。
+BUCKET_RULES = (
+    ("情趣", ("情趣", "内衣", "睡裙", "睡衣", "丁字", "开裆", "胸衣", "束身",
+              "纯欲", "私房", "漏骨", "乳胶", "透明", "透视", "网衣", "露乳",
+              "性感", "魅惑", "诱惑", "妩媚", "肉体")),
+    ("泳装", ("泳装", "比基尼", "沙滩", "海边", "冲浪", "潜水", "温泉",
+              "泡汤", "水上乐园", "泳池", "热带度假", "深海")),
+    ("古风", ("古装", "汉服", "唐装", "宋制", "明制", "魏晋", "国风", "敦煌",
+              "武侠", "仙女", "神仙", "旗袍", "和服", "韩服", "奥黛", "纱丽",
+              "蒙古袍", "藏袍", "苗银", "彝族", "西域", "丝路", "新中式",
+              "禅意", "唐卡", "汉元素", "戏曲", "清汉", "襦裙", "深衣",
+              "婚服", "霞帔", "云肩", "马面", "袄裙", "氅", "道袍", "飞天",
+              "民国", "旗装", "工笔", "水墨", "浮世绘", "藏装", "维吾尔",
+              "民族", "敦煌壁画", "长衫")),
+    ("制服", ("JK", "校服", "水手", "学院", "制服", "护士", "空姐", "女警",
+              "军装", "女仆", "OL", "职场", "秘书", "兔女郎", "猫娘", "体操",
+              "拉拉队", "警服", "白大褂", "服务员", "快递员", "厨师服",
+              "cosplay", "军官", "飞行员", "赛车手", "骑手", "乘务", "列车员",
+              "律师", "教师", "医生", "教练", "白领", "警官", "特警", "海关",
+              "安检", "仪仗", "执事", "管家", "侍者", "咖啡师", "烘焙师",
+              "花艺师", "理发师", "调酒师", "保安", "空乘", "士兵", "机长",
+              "练习生", "图书管理员", "电竞")),
+    ("运动", ("运动", "健身", "瑜伽", "跑步", "舞蹈", "田径", "骑行", "网球",
+              "篮球", "芭蕾", "国标", "民族舞", "古典舞", "现代舞", "街舞",
+              "爵士", "探戈", "滑雪", "登山", "攀岩", "拳击", "搏击",
+              "跆拳道", "柔道", "击剑", "射箭", "马术", "滑板", "马拉松",
+              "运动员", "舞者")),
+    ("甜系", ("洛丽塔", "哥特", "公主", "甜美", "糖果", "少女", "初恋",
+              "糖水", "森系", "田园", "波西米亚", "软萌", "童话", "草莓",
+              "奶油", "马卡龙", "芭蕾风", "棉花糖", "甜品", "玩偶", "兔子",
+              "猫咪", "花房", "野餐", "游乐园", "旋转木马", "摩天轮",
+              "甜心", "幼态", "精灵", "魔法少女")),
+    ("高定", ("晚宴", "礼服", "婚纱", "红毯", "高级时装", "杂志封面",
+              "品牌广告", "商业人像", "名媛", "小香风", "英伦", "法式",
+              "老钱", "静奢", "贵气", "秀场", "T台", "颁奖", "沙龙",
+              "酒会", "宴会", "高定", "晚装", "奢华", "贵妇", "夫人",
+              "富家千金", "大小姐", "优雅", "知性", "轻熟", "御姐")),
+    ("街头", ("街头", "嘻哈", "朋克", "机能", "Y2K", "千禧", "赛博", "废土",
+              "蒸汽", "暗黑", "街拍", "机车", "工装", "中性", "涂鸦",
+              "说唱", "乐队", "DJ", "音乐节", "livehouse", "机甲",
+              "仿生人", "未来", "太空", "废墟", "工业", "公路", "沙漠",
+              "丛林", "星河", "程序员", "摄影师", "导演", "演员", "模特",
+              "偶像", "舞台", "电竞选手", "酷飒")),
+    ("复古", ("复古", "港风", "胶片", "80年代", "90年代", "怀旧", "老上海",
+              "月份牌", "迪斯科", "摇滚", "老照片", "宝丽来", "CCD", "DV",
+              "老电影", "老街", "弄堂", "石库门", "绿皮火车", "千禧风",
+              "油画", "蒸汽波")),
+)
+
+BUCKET_CFG = {
+    "古风": {
+        "garment": (("服装造型", "古装"),),
+        "shoes": ("鞋子类型", "古风鞋"),
+        "headwear": ("头部配饰", "古风头饰"),
+        "scene": (("场景环境", "古风场景"),),
+        "material": ("丝绸", "缎", "真丝", "雪纺", "纱", "棉麻", "亚麻",
+                     "丝绒", "天鹅绒", "金丝绒", "绒面", "织锦", "提花",
+                     "刺绣", "欧根", "毛呢", "羊毛", "薄纱", "醋酸", "棉",
+                     "宋锦", "香云纱"),
+        "plain_color": True,
+        "stockings": False,
+        "force_shoes": True,
+        "type_override": "国风",
+    },
+    "制服": {
+        "garment": (("服装造型", "制服校服"),),
+        "shoes": ("鞋子类型", "制服鞋"),
+        "headwear": ("头部配饰", "制服头饰"),
+        "scene": (("场景环境", "制服场景"),),
+        "material": ("棉", "针织", "罗纹", "羊毛", "羊绒", "毛呢", "灯芯绒",
+                     "牛仔", "皮革", "纳帕", "漆皮", "雪纺", "真丝", "缎",
+                     "粗花呢", "千鸟格", "威尔士格", "苏格兰格", "人字纹",
+                     "PVC", "麂皮"),
+        "plain_color": True,
+        "stockings": True,
+        "force_shoes": True,
+        "type_override": "学院风",
+    },
+    "泳装": {
+        "garment": (("服装造型", "泳装"),),
+        "shoes": ("鞋子类型", "泳装鞋"),
+        "headwear": ("头部配饰", "头饰"),
+        "scene": (("场景环境", "泳装场景"),),
+        "material": ("冰丝", "莫代尔", "人棉", "天丝", "网眼", "针织",
+                     "罗纹", "亮片", "珠片", "烫钻", "水钻", "PVC", "镭射",
+                     "反光", "液态金属", "网纱", "蕾丝", "雪纺", "弹力"),
+        "plain_color": False,
+        "stockings": False,
+        "force_shoes": True,
+        "type_override": "泳装",
+    },
+    "运动": {
+        "garment": (("服装造型", "运动服装"),),
+        "shoes": ("鞋子类型", "运动鞋类"),
+        "headwear": ("头部配饰", "运动头饰"),
+        "scene": (("场景环境", "运动场景"),),
+        "material": ("冰丝", "莫代尔", "人棉", "天丝", "网眼", "针织",
+                     "罗纹", "棉", "弹力", "防水", "反光", "夜光"),
+        "plain_color": True,
+        "stockings": False,
+        "force_shoes": True,
+        "type_override": "运动风",
+    },
+    "甜系": {
+        "garment": (("服装造型", "甜系服装"),),
+        "shoes": ("鞋子类型", "甜系鞋"),
+        "headwear": ("头部配饰", "甜系头饰"),
+        "scene": (("场景环境", "甜系场景"),),
+        "material": ("蕾丝", "雪纺", "纱", "欧根", "针织", "棉", "绒",
+                     "丝绒", "天鹅绒", "缎", "真丝", "亮片", "珠片",
+                     "烫钻", "羽毛", "立体花", "3D压花", "荷叶边", "褶皱",
+                     "毛呢", "羊毛", "羊羔绒", "刺绣"),
+        "plain_color": False,
+        "stockings": True,
+        "type_override": "甜美风",
+    },
+    "高定": {
+        "garment": (("服装造型", "高定服装"),),
+        "shoes": ("鞋子类型", "高定鞋"),
+        "headwear": ("头部配饰", "高定头饰"),
+        "scene": (("场景环境", "高定场景"),),
+        "material": ("缎", "真丝", "丝绸", "丝绒", "天鹅绒", "绒", "蕾丝",
+                     "纱", "欧根", "薄纱", "织锦", "提花", "刺绣", "珠片",
+                     "亮片", "钉珠", "烫钻", "水钻", "羽毛", "立体花",
+                     "3D压花", "粗花呢", "千鸟格", "金属", "液态金属",
+                     "皮革", "麂皮", "雪纺", "醋酸"),
+        "plain_color": True,
+        "stockings": True,
+        "force_shoes": True,
+        "type_override": "高级时装",
+    },
+    "街头": {
+        "garment": (("服装造型", "街头服装"),),
+        "shoes": ("鞋子类型", "街头鞋"),
+        "headwear": ("头部配饰", "街头头饰"),
+        "scene": (("场景环境", "街头场景"),),
+        "material": ("牛仔", "皮革", "纳帕", "磨砂皮", "漆皮", "鳄鱼",
+                     "压纹", "网纱", "网眼", "针织", "罗纹", "棉麻",
+                     "灯芯绒", "麂皮", "PVC", "反光", "夜光", "镭射",
+                     "液态金属", "金属丝", "防水", "迷彩", "牛皮"),
+        "plain_color": False,
+        "stockings": True,
+        "type_override": "街头风",
+    },
+    "复古": {
+        "garment": (("服装造型", "复古服装"),),
+        "shoes": ("鞋子类型", "复古鞋"),
+        "headwear": ("头部配饰", "复古头饰"),
+        "scene": (("场景环境", "复古场景"),),
+        "material": ("粗花呢", "千鸟格", "人字纹", "威尔士格", "苏格兰格",
+                     "灯芯绒", "丝绒", "天鹅绒", "金丝绒", "雪尼尔", "毛呢",
+                     "羊毛", "羊绒", "皮革", "麂皮", "棉麻", "亚麻", "针织",
+                     "蕾丝", "雪纺", "缎", "真丝", "牛仔", "珠片", "亮片",
+                     "烫钻", "丝绒压花"),
+        "plain_color": False,
+        "stockings": True,
+        "type_override": "复古风",
+    },
+    "情趣": {
+        "garment": (),
+        "shoes": ("鞋子类型", "情趣鞋"),
+        "headwear": ("头部配饰", "情趣头饰"),
+        "scene": (("场景环境", "情趣场景"),),
+        "material": (),
+        "plain_color": True,
+        "stockings": True,
+        "force_shoes": True,
+        "type_override": "私房",
+    },
+    "通用": {
+        "garment": (("服装造型", "上衣"), ("服装造型", "连衣裙"),
+                    ("服装造型", "制服校服")),
+        "shoes": ("鞋子类型", "鞋类"),
+        "headwear": ("头部配饰", "头饰"),
+        "scene": (("场景环境", "室内场景"), ("场景环境", "室外场景")),
+        "material": (),
+        "plain_color": False,
+        "stockings": True,
+        "type_override": "",
+    },
+}
+
+# 自带图案感的颜色 / 材质：二者不能同时出现（"格纹材质 + 印花颜色"会打架）
+PATTERN_COLOR = ("印花", "格纹", "条纹", "波点", "撞色", "拼色", "渐变",
+                 "扎染", "鎏金", "描金", "烫银", "晕染")
+PATTERN_MATERIAL = ("格", "纹", "印花", "提花", "织锦", "千鸟", "人字",
+                    "3D压花", "褶皱", "亮片", "珠片", "钉珠", "烫钻",
+                    "水钻", "羽毛", "立体花", "渐变", "扎染", "刺绣")
+
+# 情趣向丝袜（NSFW 自动补丝袜时优先用这些）
+SEXY_STOCKINGS = ("渔网袜", "网格袜", "菱形网袜", "大网格袜", "细网格袜",
+                  "吊带丝袜", "开裆丝袜", "大腿袜", "过膝丝袜", "长筒丝袜",
+                  "蕾丝丝袜", "花边丝袜", "亮丝丝袜", "破洞丝袜", "彩色丝袜",
+                  "红色丝袜", "黑色丝袜", "分段式丝袜")
+
+# 头部配饰的动词：原逻辑一律写"佩戴XX"，遇到"手表/围巾/项链"就很别扭
+HEADWEAR_VERB_RULES = (
+    ("搭配", ("丝巾", "围巾", "披肩", "披帛", "手套", "腰", "包", "链",
+              "香囊", "挂件", "工牌", "胸卡", "耳机", "面具", "眼罩",
+              "口塞", "臂环", "脚链", "踝链", "对讲机", "耳麦", "香薰")),
+    ("颈间佩戴", ("项链", "颈环", "颈饰", "choker", "项圈", "领结", "领带",
+                  "领花", "领巾", "长命锁", "平安扣", "铃铛choker")),
+    ("耳畔戴着", ("耳环", "耳钉", "耳坠", "耳线", "耳夹", "耳骨", "耳饰",
+                  "耳扣", "耳挂", "耳链", "耳圈", "耳廓")),
+    ("戴着", ("口罩", "眼镜", "墨镜", "面纱", "蒙眼", "面罩", "护目",
+              "镜框", "镜片")),
+    ("头戴", ("帽", "发", "簪", "钗", "冠", "环", "箍", "夹", "绳",
+              "圈", "梳", "钿", "胜", "步摇", "抹额", "纱", "巾", "笠")),
+)
+
+FRAMING_RULES = (
+    ("全身", "全身像，从头到脚完整呈现，"),
+    ("七分", "七分身像，膝盖以上，"),
+    ("半身", "半身肖像，腰部以上，"),
+    ("胸像", "半身肖像，胸部以上，"),
+    ("特写", "面部特写，胸部以上，"),
+    ("脸", "面部特写，胸部以上，"),
+    ("头", "面部特写，胸部以上，"),
+    ("眼", "眼部特写，只呈现眉眼，"),
+    ("唇", "唇部特写，只呈现唇部，"),
+    ("手", "手部特写，只呈现手部，"),
+    ("局部", "局部细节特写，"),
+    ("背影", "全身背影，从头到脚完整呈现，"),
+)
+
+
+# 只能在室外成立的天气/天象。promptlib 里那套按"雨天/雪天"整词匹配，
+# 词库扩充后新增的"暴雨/阵雨/落雪/扬沙"等漏掉了，这里按关键词兜住。
+OUTDOOR_WEATHER_KEYS = (
+    "雨", "雪", "雾", "霾", "沙", "风", "雷", "雹", "霜", "冰",
+    "彩虹", "极光", "银河", "星空", "满月", "日出", "日落", "破晓", "暮色",
+)
+
+# promptlib 的 INDOOR_HINTS 没覆盖词库扩充后新增的场景（"水晶酒柜"之类），
+# 这里在节点内补一层，避免室内场景配上"暴雨/落雪"这种天气。
+INDOOR_HINTS_EXT = (
+    "酒柜", "书柜", "柜", "沙龙", "会所", "大堂", "包厢", "套房", "公寓",
+    "客房", "试衣间", "更衣室", "化妆间", "壁炉", "剧院", "音乐厅", "拍卖",
+    "琴房", "禅房", "闺", "绣楼", "殿", "佛塔", "石窟", "吧台", "吧",
+    "柜台", "收银", "走廊", "楼道", "电梯", "玄关", "阁", "寮", "舱",
+    "舷窗", "影厅", "影院", "棚", "仓库", "车间", "作坊", "工坊", "室",
+    "房", "厅", "馆", "店", "屋", "榻", "床", "镜前", "窗前", "楼梯",
+)
+
+# 各桶不合适的丝袜（给高定/制服这类场合挡掉荧光、破洞、彩色这类）
+STOCKING_BLOCK = {
+    "高定": ("荧光", "破洞", "做旧", "磨损", "补丁", "彩色", "红色", "蓝色",
+             "紫色", "绿色", "黄色", "橙色", "渐变", "开裆", "吊带", "渔网",
+             "虎纹", "豹纹", "蛇纹", "奶牛", "斑马", "菱形", "网格", "字母",
+             "logo", "卡通", "爱心", "星星", "佩斯利", "千鸟", "苏格兰"),
+    "制服": ("荧光", "破洞", "开裆", "吊带", "做旧", "磨损", "补丁"),
+    "甜系": ("开裆", "破洞", "做旧", "磨损", "补丁", "荧光"),
+    "复古": ("荧光", "破洞"),
+    "通用": ("荧光",),
+}
+
+
+def _is_outdoor_weather(w):
+    s = str(w or "")
+    return any(k in s for k in OUTDOOR_WEATHER_KEYS)
+
+
+def _looks_indoor(scene):
+    s = str(scene or "")
+    if PL.looks_indoor(s):
+        return True
+    return any(k in s for k in INDOOR_HINTS_EXT)
+
+
+def _bucket_of(text):
+    s = str(text or "")
+    if not s:
+        return ""
+    for name, keys in BUCKET_RULES:
+        for k in keys:
+            if k in s:
+                return name
+    return ""
+
+
+def _headwear_verb(word):
+    s = str(word or "")
+    for verb, keys in HEADWEAR_VERB_RULES:
+        for k in keys:
+            if k in s:
+                return verb
+    # 兜底用"搭配"：比一律"佩戴"自然，"佩戴手表/佩戴勋章"读着别扭
+    return "搭配"
+
+
+def _framing_desc(value):
+    s = str(value or "")
+    for key, desc in FRAMING_RULES:
+        if key in s:
+            return desc
+    return "半身肖像，腰部以上，"
+
+
+def _age_title(age_text):
+    digits = "".join(ch for ch in str(age_text or "") if ch.isdigit())
+    if not digits:
+        return "年轻女性"
+    try:
+        n = int(digits)
+    except ValueError:
+        return "年轻女性"
+    if n <= 19:
+        return "少女"
+    if n <= 26:
+        return "年轻女性"
+    if n <= 32:
+        return "轻熟女性"
+    return "成熟女性"
+
 
 class ZImagePromptGeneratorNode:
 
@@ -138,8 +459,10 @@ class ZImagePromptGeneratorNode:
 
         def resolve(value, group, sub):
             if value == "随机":
-                pool = libs.get(group, {}).get(sub) or []
-                return rng.choice(pool) if pool else ""
+                # 排除占位项，否则会真的生成"穿着随机，""景别：随机"这种句子
+                p = [x for x in (libs.get(group, {}).get(sub) or [])
+                     if x not in ("无", "随机", "")]
+                return rng.choice(p) if p else ""
             if value == "无":
                 return ""
             return value
@@ -197,6 +520,12 @@ class ZImagePromptGeneratorNode:
         }
 
 
+    # 戴帽子时不宜同时出现的发型（丸子头/高马尾上面再扣顶帽子会很怪）
+    HAIR_BLOCK_WITH_HAT = ("丸子头", "高马尾", "双马尾", "公主头", "花苞头",
+                           "盘发", "低盘发", "发髻", "编发", "麻花辫",
+                           "拳击辫", "蜈蚣辫", "丝带编发", "盘发插梳",
+                           "垂鬟", "半扎发", "低马尾")
+
     def _compose(self, libs, rng, style, type_val, detail_level, action, race_choice,
                  contact_lens_choice, stocking, headwear, shoes, sexy_clothing,
                  framing, include_pose, include_details, include_quality,
@@ -211,16 +540,65 @@ class ZImagePromptGeneratorNode:
             p = pool(group, sub)
             return rng.choice(p) if p else ""
 
-        nsfw_body = (rng.choice(pool("NSFW元素", "身体强调")) + "，") if nsfw else ""
-        if nsfw and (not sexy_clothing or sexy_clothing == "无"):
-            cand = [x for x in pool("情趣服装", "情趣衣服") if x not in ("无", "随机")]
+        def pick_multi(refs):
+            """从多组候选池里随机挑一组再抽一条（池级别随机，不是条目级别）。"""
+            filled = [(g, s) for g, s in refs if pool(g, s)]
+            if not filled:
+                return ""
+            return pick(*rng.choice(filled))
+
+        def is_on(v):
+            return bool(v) and v != "无"
+
+        # --------------------------------------------------------------
+        # 1) 定风格桶：情趣衣服 > NSFW > 拍摄类型 > 拍摄风格
+        #    桶一旦定下，服装/材质/颜色/丝袜/鞋子/头饰/场景全部跟着它走
+        # --------------------------------------------------------------
+        sexy_on = is_on(sexy_clothing)
+        if nsfw and not sexy_on:
+            cand = [x for x in pool("情趣服装", "情趣衣服")
+                    if x not in ("无", "随机")]
             if cand:
                 sexy_clothing = rng.choice(cand)
-        if nsfw and stocking == "无":
-            cand = [s for s in pool("丝袜类型", "丝袜种类") if s not in ("无", "随机")]
-            if cand:
-                stocking = rng.choice(cand)
+                sexy_on = True
 
+        if sexy_on:
+            bucket = "情趣"
+        else:
+            bucket = (_bucket_of(type_val) or _bucket_of(style) or "通用")
+        cfg = BUCKET_CFG.get(bucket, BUCKET_CFG["通用"])
+
+        # 情趣桶下，如果「拍摄类型」还指向别的风格（比如古装/制服），
+        # 就换成私房——否则开头写"古装"、身上是情趣内衣，前后打架。
+        if bucket == "情趣" and type_val:
+            tb = _bucket_of(type_val)
+            if tb and tb != "情趣":
+                type_val = cfg.get("type_override") or "私房"
+
+        # --------------------------------------------------------------
+        # 2) 头部配饰：用户显式选的尊重；选"随机"时按桶抽
+        # --------------------------------------------------------------
+        if headwear == "随机":
+            headwear = pick(*cfg["headwear"]) or pick("头部配饰", "头饰")
+        headwear_on = is_on(headwear)
+        headwear_verb = _headwear_verb(headwear) if headwear_on else ""
+
+        # --------------------------------------------------------------
+        # 3) 鞋子：用户显式选的尊重；选"随机"时按桶抽
+        # --------------------------------------------------------------
+        if shoes == "随机":
+            shoes = pick(*cfg["shoes"]) or pick("鞋子类型", "鞋类")
+        elif cfg.get("force_shoes") and is_on(shoes):
+            # 情趣/古风这类强风格桶：用户选的鞋若不在这个桶的鞋池里就换掉，
+            # 免得出现"情趣内衣 + 劳保鞋""汉服 + 篮球鞋"这种组合
+            allowed = set(pool(*cfg["shoes"]))
+            if allowed and shoes not in allowed:
+                shoes = rng.choice(sorted(allowed))
+        shoes_on = is_on(shoes)
+
+        # --------------------------------------------------------------
+        # 4) 人物
+        # --------------------------------------------------------------
         age_str = "{}的".format(selected_age) if selected_age != "无" else ""
         body_str = "{}，".format(selected_body) if selected_body != "无" else ""
 
@@ -231,31 +609,94 @@ class ZImagePromptGeneratorNode:
         while face2 == face1 and guard < 20:
             face2 = pick("模特设定", "面部特征")
             guard += 1
+
         hair = pick("模特设定", "发型发色")
+        if headwear_on and headwear_verb == "头戴" and "帽" in str(headwear):
+            for _ in range(12):
+                if not any(k in str(hair) for k in self.HAIR_BLOCK_WITH_HAT):
+                    break
+                hair = pick("模特设定", "发型发色")
 
-        if type_val == "古装":
-            clothing_type = pick("服装造型", "古装")
+        # --------------------------------------------------------------
+        # 5) 主服装：全场只有一套。情趣衣服与常规服装二选一，情趣优先。
+        # --------------------------------------------------------------
+        garment = ""
+        material = ""
+        color = ""
+        if sexy_on:
+            # 情趣衣服自带完整描述，不再叠材质/颜色，也不再叠常规服装
+            outfit = "穿着{}，".format(sexy_clothing)
         else:
-            clothing_type = rng.choice([pick("服装造型", "上衣"),
-                                        pick("服装造型", "连衣裙"),
-                                        pick("服装造型", "制服校服")])
+            garment = pick_multi(cfg["garment"]) or pick_multi(
+                BUCKET_CFG["通用"]["garment"])
+            if garment:
+                mpool = pool("服装造型", "材质")
+                keys = cfg.get("material") or ()
+                if keys:
+                    narrowed = [m for m in mpool
+                                if any(k in str(m) for k in keys)]
+                    if narrowed:
+                        mpool = narrowed
+                material = PL.pick_compatible(
+                    mpool, lambda m: PL.material_fits(m, garment), rng)
 
-        material_pool = pool("服装造型", "材质")
-        material = PL.pick_compatible(
-            material_pool, lambda m: PL.material_fits(m, clothing_type), rng
-        )
-        color = pick("服装造型", "颜色")
+                cpool = pool("服装造型", "颜色")
+                block_pattern = bool(cfg.get("plain_color")) or any(
+                    k in str(material) for k in PATTERN_MATERIAL)
+                if block_pattern:
+                    narrowed = [c for c in cpool
+                                if not any(k in str(c) for k in PATTERN_COLOR)]
+                    if narrowed:
+                        cpool = narrowed
+                color = rng.choice(cpool) if cpool else ""
+            outfit = "身着{}{}{}，".format(color, material, garment) if garment else ""
 
-        scene_group = rng.choice(["室内场景", "室外场景"])
-        scene = pick("场景环境", scene_group)
+        # --------------------------------------------------------------
+        # 6) 丝袜：与服装重复就不再叠加（情趣衣服自带袜、长裤等）
+        # --------------------------------------------------------------
+        lower_cloth = str(sexy_clothing or "") + str(garment)
+        has_legwear = any(k in lower_cloth for k in
+                          ("丝袜", "网袜", "袜", "裤", "连体", "裙裤"))
+        if not cfg.get("stockings", True) or has_legwear:
+            stocking = "无"
+        block = STOCKING_BLOCK.get(bucket, ())
+        if block and is_on(stocking):
+            if any(k in str(stocking) for k in block):
+                cand = [s for s in pool("丝袜类型", "丝袜种类")
+                        if not any(k in str(s) for k in block)]
+                stocking = rng.choice(cand) if cand else "无"
+        if nsfw and (not is_on(stocking)) and not has_legwear:
+            cand = [s for s in SEXY_STOCKINGS if s in pool("丝袜类型", "丝袜种类")]
+            if cand:
+                stocking = rng.choice(cand)
+        if is_on(stocking):
+            outfit += "搭配{}，".format(stocking)
+
+        # --------------------------------------------------------------
+        # 7) 场景 / 天气：按桶取场景，时间天气再做室内外过滤
+        # --------------------------------------------------------------
+        scene = pick_multi(cfg["scene"])
+        if not scene:
+            scene = pick("场景环境", rng.choice(["室内场景", "室外场景"]))
+
         atmosphere = coherent["氛围"]
+        if nsfw:
+            ero = pick("NSFW元素", "情色氛围")
+            if ero:
+                atmosphere = "{}，{}".format(atmosphere, ero).strip("，")
+
+        def weather_ok(w):
+            if not _is_outdoor_weather(w):
+                return True
+            return not _looks_indoor(scene)
 
         weather_pool = pool("场景环境", "时间天气")
-        time_weather = PL.pick_compatible(
-            weather_pool, lambda w: PL.weather_fits(w, scene), rng
-        )
+        time_weather = PL.pick_compatible(weather_pool, weather_ok, rng)
         scene_phrase = self._scene_phrase(time_weather, scene, atmosphere)
 
+        # --------------------------------------------------------------
+        # 8) 镜头 / 构图 / 光线 / 色调
+        # --------------------------------------------------------------
         lens = pick("拍摄参数", "镜头")
         composition = pick("构图光影", "构图")
         depth = pick("构图光影", "景深")
@@ -266,17 +707,21 @@ class ZImagePromptGeneratorNode:
         expression = coherent["表情"]
         eyes = coherent["眼神"]
 
-        pose = action if action != "无" else (
-            pick("姿势动作", "全身姿势") if include_pose else "")
+        # --------------------------------------------------------------
+        # 9) 姿势：NSFW 走性感姿势池，否则走全身姿势池
+        # --------------------------------------------------------------
+        if is_on(action):
+            pose = action
+        elif nsfw:
+            pose = pick("NSFW元素", "性感姿势") if include_pose else ""
+        else:
+            pose = pick("姿势动作", "全身姿势") if include_pose else ""
 
-        framing_desc = {
-            "全身照": "全身像，从头到脚完整呈现，",
-            "七分照": "七分身像，膝盖以上，",
-            "半身照": "半身肖像，腰部以上，",
-            "特写": "面部特写，胸部以上，",
-            "局部特写": "局部细节特写，",
-        }.get(framing, "半身肖像，")
+        nsfw_body = pick("NSFW元素", "身体强调") if nsfw else ""
 
+        # --------------------------------------------------------------
+        # 10) 拼装
+        # --------------------------------------------------------------
         parts = []
         if style:
             parts.append(style)
@@ -284,25 +729,26 @@ class ZImagePromptGeneratorNode:
             parts.append(type_val)
         lens_txt = lens if "镜头" in str(lens) else "{}镜头".format(lens)
         parts.append("，使用{}拍摄。".format(lens_txt))
-        parts.append(framing_desc)
+        parts.append(_framing_desc(framing))
 
-        parts.append("一位{}{}年轻女性，{}拥有{}，{}，{}，气质{}。"
-                     .format(age_str, race_desc, body_str, face1, face2, hair,
-                             coherent["气质"]))
+        parts.append("一位{}{}{}，{}拥有{}，{}，{}，气质{}。"
+                     .format(age_str, race_desc, _age_title(selected_age),
+                             body_str, face1, face2, hair, coherent["气质"]))
 
-        if contact_lens_choice and contact_lens_choice != "无":
+        if nsfw_body:
+            parts.append("{}。".format(nsfw_body))
+
+        if is_on(contact_lens_choice):
             parts.append("佩戴{}美瞳，".format(contact_lens_choice))
-        if sexy_clothing and sexy_clothing != "无":
-            parts.append("穿着{}，".format(sexy_clothing))
-
-        clothing_desc = "身着{}{}{}，{}".format(color, material, clothing_type, nsfw_body)
-        if stocking and stocking != "无":
-            clothing_desc += "搭配{}，".format(stocking)
-        parts.append(clothing_desc)
-
-        if headwear and headwear != "无":
-            parts.append("佩戴{}，".format(headwear))
-        if shoes and shoes != "无":
+        if outfit:
+            parts.append(outfit)
+        if headwear_on:
+            verb = headwear_verb
+            # 丝袜已经用过"搭配"了，头饰换个说法，避免一句话里两个"搭配"
+            if verb == "搭配" and "搭配" in outfit:
+                verb = "另有"
+            parts.append("{}{}，".format(verb, headwear))
+        if shoes_on:
             parts.append("脚穿{}，".format(shoes))
 
         if pose:
@@ -333,7 +779,11 @@ class ZImagePromptGeneratorNode:
                                      " --ar 3:4 --stylize 650",
                                      " --ar 2:3 --style raw"]))
 
-        return "".join(parts).strip("，") + "。"
+        text = "".join(parts).strip("，").strip()
+        # 关掉后缀参数时最后一句已经带句号了，再补一个会变成"。。"
+        if not text.endswith(("。", "！", "!", ".", "；", ";")):
+            text += "。"
+        return text
 
     @staticmethod
     def _scene_phrase(time_weather, scene, atmosphere):
@@ -343,7 +793,10 @@ class ZImagePromptGeneratorNode:
                 "雪天": "窗外飘着雪", "雾天": "窗外起了薄雾", "彩虹天": "窗外天边挂着彩虹",
                 "台风天": "窗外风雨交加", "雷雨天": "窗外雷雨交加",
                 "沙尘天": "窗外沙尘漫天", "极光夜": "窗外夜空泛着极光"}.get(w)
-        if verb and PL.looks_indoor(s):
+        # 室内场景配天气词会变成"置身于暴雨水晶酒柜"，这里直接丢掉天气
+        if w and _looks_indoor(s) and _is_outdoor_weather(w):
+            return "置身于{}，氛围{}。".format(s, atmosphere)
+        if verb and _looks_indoor(s):
             return "置身于{}，{}，氛围{}。".format(s, verb, atmosphere)
         return "置身于{}{}，氛围{}。".format(w, s, atmosphere)
 
