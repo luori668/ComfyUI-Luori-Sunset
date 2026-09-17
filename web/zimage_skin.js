@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 
-const SKIN_VERSION = "1.0.5";
+const SKIN_VERSION = "1.0.8";
 
 const NODES = {
   ZImagePromptGeneratorNode: {
@@ -17,6 +17,11 @@ const NODES = {
     tag: "STYLE PRESET",
     hue: ["#FF2E93", "#FF7A9C", "#FF8A3D"],
     bg: ["rgba(255,46,147,.20)", "rgba(255,122,156,.15)", "#2A0F22", "#160A18"],
+  },
+  SunsetNSPromptSelector: {
+    tag: "NS MIXER",
+    hue: ["#FF3D71", "#8B2FF7", "#22D3EE"],
+    bg: ["rgba(255,61,113,.20)", "rgba(139,47,247,.20)", "#26081C", "#120814"],
   },
 };
 
@@ -62,6 +67,8 @@ const CONFIG = {
 };
 
 const WEAR_MIN_W = 400;
+const NS_MIN_W = 520;
+let NS_TRIGGERS = null;
 
 const TITLE_H = 30;
 
@@ -144,7 +151,7 @@ function injectCSS() {
   box-sizing:border-box; width:100%; padding:${CONFIG.panelPad}px;
   /* 高度必须由内容决定：ComfyUI 会给这个元素加 h-full 类，
      一旦跟着父盒子走 → 面板被压扁 → 内容被裁。!important 用来压过 h-full */
-  height:auto !important; min-height:0; overflow:visible;
+  height:auto !important; min-height:0; overflow:hidden;
   font:12px/1.45 "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
   color:var(--tx); border-radius:12px;
   background:
@@ -182,6 +189,16 @@ function injectCSS() {
   background:linear-gradient(90deg,var(--gc,rgba(255,138,61,.5)),transparent);}
 
 .zs-two{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.zs-two>*,.zs-four>*,.zs-five>*,.zs-ta2>*,.zs-wbox>*,.zs-w4>*{min-width:0;}
+.zs-four{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.zs-five{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.zs-ta2{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.zs-pool.wide{grid-template-columns:1fr 1fr 1fr;max-height:110px;}
+.zs-out{display:flex;flex-direction:column;gap:5px;}
+.zs-out textarea{width:100%;resize:none;border-radius:7px;outline:none;overflow:auto;
+  padding:6px 8px;font:10.5px/1.5 inherit;color:#D8D2F5;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.1);}
+.zs-out textarea::placeholder{color:#5F5880;}
 .zs-one{margin-top:6px;}
 
 /* 下拉：外面套一层壳，好看又能放箭头 */
@@ -354,6 +371,55 @@ function injectCSS() {
 .zs-hint b{color:#FFD08A;font-weight:700;}
 .zs-empty{padding:14px 8px;text-align:center;font-size:11px;color:#FF9BAE;
   background:rgba(255,61,113,.08);border:1px dashed rgba(255,61,113,.35);border-radius:9px;}
+
+.zs-gh.zs-click{cursor:pointer;user-select:none;}
+.zs-gh.zs-click:hover b{color:#fff;}
+.zs-arw{margin-left:auto;font:700 12px/1 Consolas,monospace;color:var(--dim);
+  padding:2px 5px;border-radius:4px;background:rgba(255,255,255,.06);}
+.zs-arw::after{content:"\\25B4";}
+.zs-fold.closed .zs-arw::after{content:"\\25BE";}
+.zs-fold.closed .zs-foldin{display:none;}
+
+.zs-pick{margin-top:7px;}
+.zs-pickbar{display:flex;align-items:center;gap:6px;}
+.zs-search{flex:1;min-width:0;height:26px;padding:0 8px;border-radius:7px;outline:none;
+  font:11px/1 inherit;color:var(--tx);
+  border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.04);}
+.zs-search:focus{border-color:rgba(255,61,113,.55);}
+.zs-search::placeholder{color:#5F5880;}
+.zs-cnt{font:700 9.5px/1 inherit;color:#FFB7D0;flex:0 0 auto;
+  border:1px solid rgba(255,183,208,.3);padding:4px 6px;border-radius:5px;}
+.zs-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;max-height:74px;overflow:auto;}
+.zs-chipx{font:600 10px/1 inherit;padding:5px 7px;border-radius:99px;cursor:pointer;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  border:1px solid rgba(255,61,113,.45);color:#FFB7D0;background:rgba(255,61,113,.12);
+  transition:all .14s;}
+.zs-chipx:hover{color:#fff;background:rgba(255,61,113,.5);}
+.zs-chipx.on{color:#16060F;background:#FF5C8A;border-color:#FF5C8A;}
+.zs-pool{margin-top:6px;max-height:132px;overflow:auto;padding-right:2px;
+  display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.zs-pool::-webkit-scrollbar{width:6px;}
+.zs-pool::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:3px;}
+.zs-chips::-webkit-scrollbar{width:6px;}
+.zs-chips::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:3px;}
+.zs-opt{font:10px/1.3 inherit;padding:5px 6px;border-radius:6px;cursor:pointer;
+  color:#B9AFD8;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);}
+.zs-opt:hover{color:#fff;border-color:rgba(255,255,255,.22);}
+.zs-opt.on{color:#16060F;background:#FF5C8A;border-color:#FF5C8A;font-weight:700;}
+.zs-nothing{grid-column:1/-1;padding:10px;text-align:center;font-size:10.5px;color:#6E6690;}
+
+.zs-wbox{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.zs-w4{grid-template-columns:repeat(4,1fr);}
+.zs-w{display:flex;align-items:center;height:28px;border-radius:8px;padding:0 8px;
+  border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.035);}
+.zs-w span{font-size:9px;color:var(--dim);flex:0 0 auto;}
+.zs-w input{flex:1;min-width:0;width:100%;background:transparent;border:none;outline:none;
+  -webkit-appearance:none;appearance:none;height:3px;border-radius:2px;cursor:pointer;
+  background:linear-gradient(90deg,#FF3D71,#8B2FF7);margin-left:6px;}
+.zs-w input::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;
+  border-radius:50%;background:#fff;box-shadow:0 0 6px rgba(255,61,113,.9);cursor:pointer;}
+.zs-w b{font:700 10px/1 Consolas,monospace;color:#FFB7D0;flex:0 0 26px;text-align:right;}
 `;
   document.head.appendChild(s);
 }
@@ -408,6 +474,11 @@ function relayout(node, root) {
 
   clearStaleDrag(node);
 
+  if (node.comfyClass === "SunsetNSPromptSelector") {
+    root.style.width =
+      Math.max(200, Math.round((Number(node.size?.[0]) || NS_MIN_W) - 12)) + "px";
+  }
+
   const h = root.offsetHeight;
   const goal = Math.round(h + widgetY(node) + CONFIG.panelPad + CONFIG.edgeGap);
   const cur = Math.round(node.size?.[1] ?? 0);
@@ -434,6 +505,7 @@ function startWatchdog() {
       if (!ctx || n.__zsGone) continue;
       try {
         ensureHidden(n);
+        ensureNSWidth(n);
         if (typeof ctx.sync === "function") ctx.sync();
         relayout(n, ctx.root);
       } catch (e) { console.error("[ZImageSkin] 巡检失败:", e); }
@@ -618,6 +690,8 @@ function makeSelect(node, wname, shortLabel) {
     sel.addEventListener(t, (e) => e.stopPropagation()));
   wrap.appendChild(sel);
   wrap.__sel = sel;
+  wrap.__wname = wname;
+  sel.__wname = wname;
   return wrap;
 }
 
@@ -1099,6 +1173,313 @@ function ensureWearWidth(node) {
   } catch (e) {  }
 }
 
+function ensureNSWidth(node) {
+  if (node?.comfyClass !== "SunsetNSPromptSelector") return;
+  if (!CONFIG.autoResize) return;
+  try {
+    const w = Math.round(Number(node.size?.[0]) || 0);
+    const h = Math.round(Number(node.size?.[1]) || 0);
+    if (w > 0 && w < NS_MIN_W) {
+      node.setSize([NS_MIN_W, h]);
+      node.graph?.setDirtyCanvas?.(true, true);
+      node.setDirtyCanvas?.(true, true);
+      console.log(`[ZImageSkin] NS节点宽度 ${w} -> ${NS_MIN_W}`);
+    }
+  } catch (e) {  }
+}
+
+function makeFold(title, color, open) {
+  const g = section(title, color, "zs-fold" + (open ? "" : " closed"));
+  const h = g.querySelector(".zs-gh");
+  h.classList.add("zs-click");
+  h.appendChild(el("span", "zs-arw"));
+  const inner = el("div", "zs-foldin");
+  g.appendChild(inner);
+  h.addEventListener("click", () => {
+    g.classList.toggle("closed");
+    setTimeout(() => relayout(node, node.__zsCtx?.root), 0);
+    setTimeout(() => relayout(node, node.__zsCtx?.root), 120);
+  });
+  return { g, inner };
+}
+
+function shortOf(s) {
+  return String(s).replace(/\s*[（(][^）)]*[）)]\s*$/, "");
+}
+
+function makeWeight(node, wname, label) {
+  const box = el("div", "zs-w");
+  box.appendChild(el("span", null, label));
+  const inp = el("input");
+  inp.type = "range";
+  inp.min = "0";
+  inp.max = "2";
+  inp.step = "0.1";
+  const val = el("b", null, "1.0");
+  const paint = () => {
+    const v = Number(readW(node, wname, 1)) || 0;
+    if (inp.value !== String(v)) inp.value = String(v);
+    val.textContent = v.toFixed(1);
+  };
+  inp.addEventListener("input", () => {
+    val.textContent = Number(inp.value).toFixed(1);
+  });
+  inp.addEventListener("change", () => {
+    writeW(node, wname, Number(inp.value));
+  });
+  ["pointerdown", "mousedown", "wheel"].forEach((t) =>
+    inp.addEventListener(t, (e) => e.stopPropagation()));
+  box.appendChild(inp);
+  box.appendChild(val);
+  box.__paint = paint;
+  paint();
+  return box;
+}
+
+function makeText(node, wname, ph, h) {
+  const ta = el("textarea", "zs-ta");
+  ta.placeholder = ph || wname;
+  ta.style.height = (h || 32) + "px";
+  const paint = () => {
+    const v = String(readW(node, wname, "") ?? "");
+    if (document.activeElement !== ta && ta.value !== v) ta.value = v;
+  };
+  ta.addEventListener("input", () => writeW(node, wname, ta.value));
+  ["pointerdown", "mousedown", "wheel", "keydown"].forEach((t) =>
+    ta.addEventListener(t, (e) => e.stopPropagation()));
+  const box = el("div");
+  box.style.marginTop = "6px";
+  box.appendChild(ta);
+  box.__ta = ta;
+  box.__paint = paint;
+  paint();
+  return box;
+}
+
+function makeTriggerMulti(node) {
+  const box = el("div", "zs-pick");
+  const bar = el("div", "zs-pickbar");
+  const search = el("input", "zs-search");
+  search.type = "text";
+  search.placeholder = "搜触发词：猫女 / 女仆 / 1girl";
+  const cnt = el("span", "zs-cnt", "0");
+  bar.appendChild(search);
+  bar.appendChild(cnt);
+  box.appendChild(bar);
+
+  const chips = el("div", "zs-chips");
+  box.appendChild(chips);
+  const pool = el("div", "zs-pool");
+  box.appendChild(pool);
+
+  const w = findW(node, "触发词");
+  let all = (Array.isArray(w?.options?.values) ? w.options.values
+    : Array.isArray(w?.options) ? w.options : []).filter((x) => x !== "——");
+  if (!all.length && Array.isArray(NS_TRIGGERS) && NS_TRIGGERS.length) {
+    all = NS_TRIGGERS.filter((x) => x !== "——");
+  }
+
+  const refreshAll = () => {
+    if (all.length) return;
+    const w2 = findW(node, "触发词");
+    const list = (Array.isArray(w2?.options?.values) ? w2.options.values
+      : Array.isArray(w2?.options) ? w2.options : []).filter((x) => x !== "——");
+    if (list.length) all = list;
+    else if (Array.isArray(NS_TRIGGERS) && NS_TRIGGERS.length) {
+      all = NS_TRIGGERS.filter((x) => x !== "——");
+    }
+  };
+
+  const cur = () => {
+    const v = readW(node, "触发词", []);
+    if (Array.isArray(v)) return v.filter((x) => x && x !== "——");
+    const s = String(v ?? "").trim();
+    if (!s || s === "——") return [];
+    if (s.startsWith("[") && s.endsWith("]")) {
+      try {
+        const p = JSON.parse(s.replace(/'/g, '"'));
+        if (Array.isArray(p)) return p.filter((x) => x && x !== "——");
+      } catch (e) {  }
+    }
+    return [s];
+  };
+
+  const set = (arr) => writeW(node, "触发词", arr.length ? arr : ["——"]);
+
+  let kw = "";
+
+  const paintChips = () => {
+    const sel = cur();
+    cnt.textContent = String(sel.length);
+    chips.textContent = "";
+    if (!sel.length) {
+      chips.appendChild(el("div", "zs-nothing", "还没选触发词，下面点几个"));
+      return;
+    }
+    for (const s of sel) {
+      const c = el("div", "zs-chipx on", shortOf(s));
+      c.title = "点一下取消：" + s;
+      c.addEventListener("click", () => { set(cur().filter((x) => x !== s)); paint(); });
+      chips.appendChild(c);
+    }
+  };
+
+  const paintPool = () => {
+    refreshAll();
+    const sel = cur();
+    pool.textContent = "";
+    const k = kw.trim().toLowerCase();
+    let list = all;
+    if (k) list = all.filter((x) => String(x).toLowerCase().indexOf(k) >= 0);
+    if (!list.length) {
+      pool.appendChild(el("div", "zs-nothing", "没匹配到"));
+      return;
+    }
+    for (const o of list.slice(0, 400)) {
+      const b = el("div", "zs-opt" + (sel.indexOf(o) >= 0 ? " on" : ""), shortOf(o));
+      b.title = o;
+      b.addEventListener("click", () => {
+        const s2 = cur();
+        set(s2.indexOf(o) >= 0 ? s2.filter((x) => x !== o) : s2.concat([o]));
+        paint();
+      });
+      pool.appendChild(b);
+    }
+  };
+
+  const paint = () => { paintChips(); paintPool(); };
+
+  search.addEventListener("input", () => { kw = search.value; paintPool(); });
+  ["pointerdown", "mousedown", "wheel", "keydown"].forEach((t) =>
+    search.addEventListener(t, (e) => e.stopPropagation()));
+  pool.addEventListener("wheel", (e) => e.stopPropagation());
+  chips.addEventListener("wheel", (e) => e.stopPropagation());
+
+  paint();
+  box.__paint = paint;
+  box.__count = () => cur().length;
+  return box;
+}
+
+function buildNSPanel(node) {
+  const body = el("div", "zs-body");
+  const refs = {};
+
+  const head = el("div", "zs-head");
+  head.appendChild(el("div", "zs-dot"));
+  head.appendChild(el("div", "zs-title", "NS MIXER"));
+  const chip = el("div", "zs-chip", "27 参数");
+  head.appendChild(chip);
+  body.appendChild(head);
+
+  const g0 = section("触发词 · 209 条可多选", "#FF3D71");
+  const pick = makeTriggerMulti(node);
+  refs.pick = pick;
+  const poolEl = pick.querySelector(".zs-pool");
+  if (poolEl) poolEl.classList.add("wide");
+  g0.appendChild(pick);
+  body.appendChild(g0);
+
+  const g1 = section("场景 · 动作 · 服饰 · 情绪", "#FF8A3D");
+  const two1 = el("div", "zs-two");
+  two1.appendChild(makeSelect(node, "场景类型", "场景"));
+  two1.appendChild(makeSelect(node, "服饰", "服饰"));
+  two1.appendChild(makeSelect(node, "动作姿态", "动作"));
+  two1.appendChild(makeSelect(node, "情绪氛围", "情绪"));
+  g1.appendChild(two1);
+  body.appendChild(g1);
+
+  const g2 = section("镜头 · 画面 · 10 项", "#22D3EE");
+  const two2 = el("div", "zs-two");
+  const CAM = [["运镜方式", "运镜"], ["机位角度", "机位"], ["光源类型", "光源"],
+               ["光线类型", "光线"], ["镜头类型", "镜头"], ["焦距", "焦距"],
+               ["色调", "色调"], ["视觉风格", "风格"], ["特效镜头", "特效"],
+               ["镜头滤镜", "滤镜"]];
+  for (const [wn, lb] of CAM) two2.appendChild(makeSelect(node, wn, lb));
+  g2.appendChild(two2);
+  body.appendChild(g2);
+
+  const g3 = section("质量 · 负面 · 随机 · 预设", "#8B2FF7");
+  const two3 = el("div", "zs-two");
+  two3.appendChild(makeSelect(node, "质量等级", "质量"));
+  two3.appendChild(makeSelect(node, "负面提示词类型", "负面预设"));
+  two3.appendChild(makeSelect(node, "随机选择", "随机"));
+  two3.appendChild(makeSelect(node, "预设配置", "预设"));
+  g3.appendChild(two3);
+  body.appendChild(g3);
+
+  const g4 = section("权重 · 自定义文本", "#FFB020");
+  const wbox = el("div", "zs-wbox");
+  const WN = [["权重_场景", "场景"], ["权重_动作", "动作"],
+              ["权重_服饰", "服饰"], ["权重_情绪", "情绪"]];
+  for (const [wn, lb] of WN) {
+    const x = makeWeight(node, wn, lb);
+    refs[wn] = x;
+    wbox.appendChild(x);
+  }
+  g4.appendChild(wbox);
+  g4.appendChild(makeText(node, "前置提示词", "前置：可接落日生成器的中文输出", 34));
+  const tabox = el("div", "zs-ta2");
+  tabox.appendChild(makeText(node, "自定义前缀", "自定义前缀（英文）", 30));
+  tabox.appendChild(makeText(node, "自定义后缀", "自定义后缀（英文）", 30));
+  tabox.appendChild(makeText(node, "自定义负面提示词", "自定义负面提示词", 30));
+  g4.appendChild(tabox);
+  body.appendChild(g4);
+
+  const g5 = section("输出预览 · 运行后显示", "#22C55E");
+  const outbox = el("div", "zs-out");
+  const outPos = el("textarea");
+  outPos.readOnly = true;
+  outPos.placeholder = "正面提示词：运行一次后显示在这里";
+  outPos.style.height = "72px";
+  const outNeg = el("textarea");
+  outNeg.readOnly = true;
+  outNeg.placeholder = "负面提示词：运行一次后显示在这里";
+  outNeg.style.height = "40px";
+  outbox.appendChild(outPos);
+  outbox.appendChild(outNeg);
+  refs.outPos = outPos;
+  refs.outNeg = outNeg;
+  ["pointerdown", "mousedown", "wheel", "keydown"].forEach((t) => {
+    outPos.addEventListener(t, (e) => e.stopPropagation());
+    outNeg.addEventListener(t, (e) => e.stopPropagation());
+  });
+  g5.appendChild(outbox);
+  body.appendChild(g5);
+
+  body.appendChild(el("div", "zs-hint",
+    "输出三个口：<b>正面</b> / <b>负面</b> / <b>完整</b>"));
+
+  function sync() {
+    try { refs.pick.__paint?.(); } catch (e) {  }
+    for (const [wn] of WN) {
+      try { refs[wn].__paint?.(); } catch (e) {  }
+    }
+    for (const f of body.querySelectorAll(".zs-field")) {
+      const sel = f.__sel;
+      if (!sel || document.activeElement === sel) continue;
+      const nm = sel.__wname;
+      if (!nm) continue;
+      const v = String(readW(node, nm, "") ?? "");
+      if (sel.value !== v) sel.value = v;
+    }
+    for (const t of body.querySelectorAll("textarea")) {
+      void t;
+    }
+    const n = refs.pick.__count ? refs.pick.__count() : 0;
+    chip.textContent = n > 0 ? `27 参数 · 触发词 ${n}` : "27 参数";
+    const o = node.__zsNSOut;
+    if (o) {
+      const pv = String(o.pos ?? "");
+      const nv = String(o.neg ?? "");
+      if (document.activeElement !== outPos && outPos.value !== pv) outPos.value = pv;
+      if (document.activeElement !== outNeg && outNeg.value !== nv) outNeg.value = nv;
+    }
+  }
+
+  return { root: makeRoot(node), body, sync, refs };
+}
+
 function install(node) {
   if (node.__zsCtx || node.__zsGone) return;
   const cls = node.comfyClass;
@@ -1109,18 +1490,33 @@ function install(node) {
   installPainting(node);
   ensureHidden(node);
   ensureWearWidth(node);
+  ensureNSWidth(node);
   [0, 120, 400, 900, 1800].forEach((ms) =>
     setTimeout(() => { try { ensureHidden(node); } catch (e) { } }, ms));
 
   const built = cls === "ZImagePromptLoaderNode" ? buildDrawerPanel(node)
     : cls === "ZImageFashionPresetLoaderNode" ? buildWearPanel(node)
-      : buildGeneratorPanel(node);
+      : cls === "SunsetNSPromptSelector" ? buildNSPanel(node)
+        : buildGeneratorPanel(node);
 
   const root = built.root || makeRoot(node);
   if (!built.root) root.appendChild(el("div", "zs-head", "面板"));
   root.appendChild(built.body);
 
   node.__zsCtx = { root, sync: built.sync, cls };
+
+  if (cls === "SunsetNSPromptSelector") {
+    chain(node, "onExecuted", (out) => {
+      try {
+        node.__zsNSOut = {
+          pos: out?.positive?.[0] ?? "",
+          neg: out?.negative?.[0] ?? "",
+        };
+        built.sync?.();
+        relayout(node, node.__zsCtx?.root);
+      } catch (e) { }
+    });
+  }
 
   let dm = null;
   if (typeof node.addDOMWidget === "function") {
@@ -1130,7 +1526,9 @@ function install(node) {
       getHeight: () => root.offsetHeight,
     });
     if (dm) {
-      dm.computeSize = () => [CONFIG.width, root.offsetHeight];
+      dm.computeSize = () => [cls === "SunsetNSPromptSelector"
+        ? Math.max(Number(node.size?.[0]) || CONFIG.width, NS_MIN_W)
+        : CONFIG.width, root.offsetHeight];
       node.__zsDm = dm;
     }
   } else {
@@ -1186,6 +1584,19 @@ app.registerExtension({
           s[1].hidden = true;
         }
       }
+      if (nodeData?.name === "SunsetNSPromptSelector") {
+        const tspec = req["触发词"];
+        if (Array.isArray(tspec) && Array.isArray(tspec[0])) {
+          NS_TRIGGERS = tspec[0].filter((x) => x !== "——");
+        }
+        const opt = nodeData?.input?.optional || {};
+        for (const key of Object.keys(opt)) {
+          const s = opt[key];
+          if (Array.isArray(s) && s[1] && typeof s[1] === "object") {
+            s[1].hidden = true;
+          }
+        }
+      }
     } catch (e) { console.warn("[ZImageSkin] 节点定义补丁失败", e); }
   },
 
@@ -1204,6 +1615,7 @@ app.registerExtension({
       try {
         install(node);
         ensureWearWidth(node);
+        ensureNSWidth(node);
         node.__zsCtx?.sync?.();
         relayout(node, node.__zsCtx?.root);
       } catch (e) { console.warn("[ZImageSkin] 恢复节点失败", e); }
