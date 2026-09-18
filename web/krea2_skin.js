@@ -437,7 +437,7 @@ function buildPanel(node) {
   bigNS.type = "button";
   bigNS.title = "NSFW：追加 part13.json 词库\n" +
                 "五选一：开这个会自动关掉超强中文模式、KOOK、大呲花和杂项(12 源)";
-  bigNS.append(el("span", "k2-sym", "18+"), el("span", null, "NSFW"));
+  bigNS.append(el("span", "k2-sym", "18+"));
   bigNS.onclick = () => {
     const next = !readW(node, W_NAME.nsfw, false);
     writeW(node, W_NAME.nsfw, next);
