@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 
-const SKIN_VERSION = "1.0.8";
+const SKIN_VERSION = "1.1.0";
 
 const NODES = {
   ZImagePromptGeneratorNode: {
@@ -22,6 +22,11 @@ const NODES = {
     tag: "NS MIXER",
     hue: ["#FF3D71", "#8B2FF7", "#22D3EE"],
     bg: ["rgba(255,61,113,.20)", "rgba(139,47,247,.20)", "#26081C", "#120814"],
+  },
+  SunsetLRPromptBuilder: {
+    tag: "LR BUILDER",
+    hue: ["#8B2FF7", "#22D3EE", "#FF8A3D"],
+    bg: ["rgba(139,47,247,.20)", "rgba(34,211,238,.16)", "#1B1233", "#100B1F"],
   },
 };
 
@@ -68,6 +73,30 @@ const CONFIG = {
 
 const WEAR_MIN_W = 400;
 const NS_MIN_W = 520;
+const LR_MIN_W = 480;
+
+const LR_GROUPS = [
+  ["主题", ["画面比例", "成像媒介", "写真大类", "写真主题", "年龄阶段", "族裔大类", "地域族裔分支"]],
+  ["人物", ["脸型", "轮廓细节", "眼型", "瞳色", "眼睑特征", "肤色", "肤质",
+            "基础身形", "身量观感", "线条重点"]],
+  ["妆发", ["妆容模式", "整体妆容预设", "底妆质感", "眼影色系", "眼线造型", "唇妆颜色", "唇面质感",
+            "发色模式", "发色", "发色色调", "染色方式", "头发长度", "发质与卷度", "发型造型",
+            "刘海", "头部配饰"]],
+  ["服装", ["穿搭结构", "连衣裙类型", "连衣裙颜色", "连衣裙材质", "连衣裙图案",
+            "连体服类型", "连体服颜色", "连体服材质", "连体服图案",
+            "上装类型", "上装颜色", "上装材质", "上装图案",
+            "下装类型", "下装颜色", "下装材质", "下装图案",
+            "版型细节", "袜装", "鞋履", "服装配件"]],
+  ["姿态", ["画面瞬间", "基础姿态", "身体方向", "身体重心", "肩颈状态", "手部动作", "腿部动作",
+            "头部方向", "视线", "表情"]],
+  ["场景", ["场景大类", "场景地点", "时间切片", "天气状态", "前景框景", "背景环境", "环境细节",
+            "空间材质", "空间层次"]],
+  ["光影", ["主光来源", "光线方向", "光线质地", "照明落点", "阴影表现",
+            "主配色", "色温倾向", "画面对比"]],
+  ["摄影", ["景别", "画面布局", "等效焦段", "拍摄距离", "机位", "景深", "对焦位置",
+            "影像风格", "细节质地", "高光处理", "颗粒质感"]],
+];
+
 let NS_TRIGGERS = null;
 
 const TITLE_H = 30;
@@ -200,6 +229,28 @@ function injectCSS() {
   border:1px solid rgba(255,255,255,.1);}
 .zs-out textarea::placeholder{color:#5F5880;}
 .zs-one{margin-top:6px;}
+.zs-tabs{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-top:9px;}
+.zs-tabs>*{min-width:0;}
+.zs-tab{height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;
+  font-size:10.5px;color:var(--dim);cursor:pointer;user-select:none;white-space:nowrap;
+  border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.03);
+  transition:color .16s,border-color .16s,background .16s;}
+.zs-tab:hover{color:#fff;border-color:rgba(255,255,255,.24);}
+.zs-tab.on{color:#fff;border-color:transparent;
+  background:linear-gradient(150deg,var(--c1),var(--c2));}
+.zs-pane{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;}
+.zs-pane>*{min-width:0;}
+.zs-pane.off{display:none;}
+.zs-field input[type=number]{flex:1;min-width:0;background:transparent;border:none;outline:none;
+  color:#D8D2F5;font:11px/1.2 inherit;padding:0 6px;}
+.zs-btn{height:30px;padding:0 10px;border-radius:8px;cursor:pointer;font-size:10.5px;
+  color:var(--dim);border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.03);
+  transition:color .16s,border-color .16s;}
+.zs-btn:hover{color:#fff;border-color:rgba(255,255,255,.24);}
+.zs-size{margin-left:auto;flex:0 0 auto;padding:2px 9px;border-radius:99px;
+  font:700 10px/1.35 inherit;color:#9FE1CB;border:1px solid rgba(29,158,117,.42);
+  background:rgba(29,158,117,.13);}
+
 
 /* 下拉：外面套一层壳，好看又能放箭头 */
 .zs-field{position:relative;display:flex;align-items:center;height:30px;border-radius:8px;
@@ -478,6 +529,10 @@ function relayout(node, root) {
     root.style.width =
       Math.max(200, Math.round((Number(node.size?.[0]) || NS_MIN_W) - 12)) + "px";
   }
+  if (node.comfyClass === "SunsetLRPromptBuilder") {
+    root.style.width =
+      Math.max(200, Math.round((Number(node.size?.[0]) || LR_MIN_W) - 12)) + "px";
+  }
 
   const h = root.offsetHeight;
   const goal = Math.round(h + widgetY(node) + CONFIG.panelPad + CONFIG.edgeGap);
@@ -506,6 +561,7 @@ function startWatchdog() {
       try {
         ensureHidden(n);
         ensureNSWidth(n);
+        ensureLRWidth(n);
         if (typeof ctx.sync === "function") ctx.sync();
         relayout(n, ctx.root);
       } catch (e) { console.error("[ZImageSkin] 巡检失败:", e); }
@@ -1480,6 +1536,276 @@ function buildNSPanel(node) {
   return { root: makeRoot(node), body, sync, refs };
 }
 
+
+function makeLRNum(node, wname, label, min, max, step) {
+  const wrap = el("div", "zs-field");
+  wrap.appendChild(el("span", "zs-k", label || wname));
+  const input = el("input");
+  input.type = "number";
+  input.min = String(min);
+  input.max = String(max);
+  input.step = String(step);
+  input.value = String(readW(node, wname, 0) ?? 0);
+  input.addEventListener("change", () => {
+    const v = Number(input.value);
+    writeW(node, wname, Number.isFinite(v) ? v : 0);
+    node.__zsCtx?.sync?.();
+  });
+  ["pointerdown", "mousedown", "wheel", "keydown"].forEach((t) =>
+    input.addEventListener(t, (e) => e.stopPropagation()));
+  wrap.appendChild(input);
+  wrap.__input = input;
+  wrap.__wname = wname;
+  return wrap;
+}
+
+function ensureLRWidth(node) {
+  if (node?.comfyClass !== "SunsetLRPromptBuilder") return;
+  if (!CONFIG.autoResize) return;
+  try {
+    const w = Math.round(Number(node.size?.[0]) || 0);
+    const h = Math.round(Number(node.size?.[1]) || 0);
+    if (w > 0 && w < LR_MIN_W) {
+      node.setSize([LR_MIN_W, h]);
+      node.graph?.setDirtyCanvas?.(true, true);
+      node.setDirtyCanvas?.(true, true);
+    }
+  } catch (e) {  }
+}
+
+function lrPresetAPI() {
+  const a = (typeof app !== "undefined" && app?.api?.apiURL) ? app.api.apiURL("/luori/lr_presets")
+    : (typeof api !== "undefined" && api?.apiURL) ? api.apiURL("/luori/lr_presets")
+      : "/luori/lr_presets";
+  return a;
+}
+
+function lrCollectValues(node) {
+  const vals = {};
+  for (const w of node.widgets || []) {
+    if (!w || !w.name) continue;
+    vals[w.name] = w.value;
+  }
+  return vals;
+}
+
+function lrApplyValues(node, vals) {
+  for (const k of Object.keys(vals || {})) {
+    try { writeW(node, k, vals[k]); } catch (e) { }
+  }
+  node.__zsCtx?.sync?.();
+}
+
+function buildLRPresetBar(node) {
+  const row = el("div", "zs-two");
+  row.style.display = "grid";
+  row.style.gridTemplateColumns = "1fr auto auto";
+  row.style.gap = "6px";
+  row.style.marginTop = "6px";
+  const wrap = el("div", "zs-field");
+  wrap.appendChild(el("span", "zs-k", "我的预设"));
+  const sel = el("select");
+  ["pointerdown", "mousedown", "wheel"].forEach((t) =>
+    sel.addEventListener(t, (e) => e.stopPropagation()));
+  wrap.appendChild(sel);
+  const saveBtn = el("button", "zs-btn", "💾 保存");
+  saveBtn.type = "button";
+  saveBtn.title = "把当前全部选项保存为一个预设（自动命名：预设1、预设2…）";
+  const delBtn = el("button", "zs-btn", "✕");
+  delBtn.type = "button";
+  delBtn.title = "删除当前选中的预设";
+  row.appendChild(wrap);
+  row.appendChild(saveBtn);
+  row.appendChild(delBtn);
+
+  let presets = {};
+  const refresh = (pick) => {
+    sel.textContent = "";
+    const blank = el("option");
+    blank.value = "";
+    blank.textContent = "— 选择预设 —";
+    sel.appendChild(blank);
+    for (const name of Object.keys(presets)) {
+      const op = el("option");
+      op.value = name;
+      op.textContent = name;
+      sel.appendChild(op);
+    }
+    sel.value = pick != null && Object.prototype.hasOwnProperty.call(presets, pick) ? pick : "";
+  };
+  const load = async (pick) => {
+    try {
+      const r = await fetch(lrPresetAPI(), { cache: "no-store" });
+      if (r.ok) presets = (await r.json()) || {};
+    } catch (e) { }
+    refresh(pick);
+  };
+  sel.addEventListener("change", () => {
+    const name = sel.value;
+    if (name && presets[name]) lrApplyValues(node, presets[name]);
+  });
+  saveBtn.addEventListener("click", async () => {
+    let n = 1;
+    while (Object.prototype.hasOwnProperty.call(presets, `预设${n}`)) n++;
+    const name = `预设${n}`;
+    try {
+      const r = await fetch(lrPresetAPI(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save", name, values: lrCollectValues(node) }),
+      });
+      if (r.ok) {
+        presets = (await r.json()) || presets;
+        refresh(name);
+      }
+    } catch (e) { }
+  });
+  delBtn.addEventListener("click", async () => {
+    const name = sel.value;
+    if (!name) return;
+    try {
+      const r = await fetch(lrPresetAPI(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", name }),
+      });
+      if (r.ok) {
+        presets = (await r.json()) || {};
+        refresh("");
+      }
+    } catch (e) { }
+  });
+  load();
+  return row;
+}
+
+function buildLRPanel(node) {
+  const body = el("div", "zs-body");
+  const refs = { panes: [], tabs: [], texts: [] };
+  let active = 0;
+
+  const head = el("div", "zs-head");
+  head.appendChild(el("div", "zs-dot"));
+  head.appendChild(el("div", "zs-title", "LR BUILDER"));
+  const chip = el("div", "zs-chip", "落日提示词预设");
+  head.appendChild(chip);
+  body.appendChild(head);
+
+  const gTop = section("预设 · 密度 · 随机 · 种子", "#FF8A3D");
+  gTop.appendChild(makeSelect(node, "预设", "预设"));
+  const topRow = el("div", "zs-four");
+  topRow.appendChild(makeSelect(node, "提示词密度", "密度"));
+  topRow.appendChild(makeSelect(node, "随机范围", "范围"));
+  topRow.appendChild(makeLRNum(node, "随机种子", "种子", 0, 18446744073709551615, 1));
+  const roll = el("button", "zs-btn", "随机");
+  roll.type = "button";
+  roll.title = "换一个随机种子，下一次运行用新种子重新抽";
+  roll.addEventListener("click", () => {
+    writeW(node, "随机种子", Math.floor(Math.random() * 4294967295));
+    node.__zsCtx?.sync?.();
+  });
+  topRow.appendChild(roll);
+  gTop.appendChild(topRow);
+  gTop.appendChild(buildLRPresetBar(node));
+  body.appendChild(gTop);
+
+  const gField = section("细化字段 · 92 项 · 点标签切换", "#8B2FF7");
+  const tabs = el("div", "zs-tabs");
+  LR_GROUPS.forEach((g, gi) => {
+    const [name, names] = g;
+    const tab = el("div", "zs-tab", name);
+    tab.title = `${name} · ${names.length} 项`;
+    tab.addEventListener("click", () => {
+      active = gi;
+      refs.tabs.forEach((t, i) => t.classList.toggle("on", i === gi));
+      refs.panes.forEach((p, i) => p.classList.toggle("off", i !== gi));
+      const fit = () => relayout(node, node.__zsCtx?.root);
+      fit();
+      [0, 60, 200].forEach((ms) => setTimeout(fit, ms));
+    });
+    tabs.appendChild(tab);
+    refs.tabs.push(tab);
+
+    const pane = el("div", "zs-pane");
+    for (const wn of names) pane.appendChild(makeSelect(node, wn, wn));
+    pane.classList.add("off");
+    refs.panes.push(pane);
+  });
+  tabs.firstChild.classList.add("on");
+  refs.panes[0].classList.remove("off");
+  gField.appendChild(tabs);
+  refs.panes.forEach((p) => gField.appendChild(p));
+  body.appendChild(gField);
+
+  const gOut = section("输出设置 · 拼接与尺寸", "#22D3EE");
+  const outRow = el("div", "zs-two");
+  outRow.appendChild(makeSelect(node, "拼接位置", "拼接"));
+  outRow.appendChild(makeSelect(node, "输出排版", "排版"));
+  outRow.appendChild(makeSelect(node, "分辨率模式", "尺寸"));
+  outRow.appendChild(makeLRNum(node, "目标总像素（万）", "总像素(万)", 10, 1600, 10));
+  gOut.appendChild(outRow);
+  const free = makeText(node, "自由提示词", "自由提示词：按拼接位置与结构化提示词组合", 46);
+  refs.texts.push(free);
+  gOut.appendChild(free);
+  body.appendChild(gOut);
+
+  const gPrev = section("输出预览 · 运行后显示", "#22C55E");
+  const sizeChip = el("div", "zs-size", "未运行");
+  gPrev.firstChild.appendChild(sizeChip);
+  const outbox = el("div", "zs-out");
+  const outZh = el("textarea");
+  outZh.readOnly = true;
+  outZh.placeholder = "中文提示词：运行一次后显示在这里";
+  outZh.style.height = "76px";
+  const outEn = el("textarea");
+  outEn.readOnly = true;
+  outEn.placeholder = "English prompt: appears here after a run";
+  outEn.style.height = "56px";
+  outbox.appendChild(outZh);
+  outbox.appendChild(outEn);
+  refs.outZh = outZh;
+  refs.outEn = outEn;
+  ["pointerdown", "mousedown", "wheel", "keydown"].forEach((t) => {
+    outZh.addEventListener(t, (e) => e.stopPropagation());
+    outEn.addEventListener(t, (e) => e.stopPropagation());
+  });
+  gPrev.appendChild(outbox);
+  body.appendChild(gPrev);
+
+  body.appendChild(el("div", "zs-hint",
+    "四个输出口：<b>中文提示词</b> / <b>推荐宽度</b> / <b>推荐高度</b> / <b>英文提示词</b>"));
+
+  function sync() {
+    for (const f of body.querySelectorAll(".zs-field")) {
+      const sel = f.__sel;
+      if (sel) {
+        if (document.activeElement === sel) continue;
+        const v = String(readW(node, sel.__wname, "") ?? "");
+        if (sel.value !== v) sel.value = v;
+        continue;
+      }
+      const inp = f.__input;
+      if (inp) {
+        if (document.activeElement === inp) continue;
+        const v = String(readW(node, f.__wname, "") ?? "");
+        if (inp.value !== v) inp.value = v;
+      }
+    }
+    for (const t of refs.texts) {
+      try { t.__paint?.(); } catch (e) {  }
+    }
+    const o = node.__zsLROut;
+    if (o) {
+      if (document.activeElement !== outZh && outZh.value !== o.zh) outZh.value = o.zh;
+      if (document.activeElement !== outEn && outEn.value !== o.en) outEn.value = o.en;
+      const txt = o.w && o.h ? `${o.w} × ${o.h}` : "未运行";
+      if (sizeChip.textContent !== txt) sizeChip.textContent = txt;
+    }
+  }
+
+  return { root: makeRoot(node), body, sync, refs };
+}
+
 function install(node) {
   if (node.__zsCtx || node.__zsGone) return;
   const cls = node.comfyClass;
@@ -1491,13 +1817,15 @@ function install(node) {
   ensureHidden(node);
   ensureWearWidth(node);
   ensureNSWidth(node);
+  ensureLRWidth(node);
   [0, 120, 400, 900, 1800].forEach((ms) =>
     setTimeout(() => { try { ensureHidden(node); } catch (e) { } }, ms));
 
   const built = cls === "ZImagePromptLoaderNode" ? buildDrawerPanel(node)
     : cls === "ZImageFashionPresetLoaderNode" ? buildWearPanel(node)
       : cls === "SunsetNSPromptSelector" ? buildNSPanel(node)
-        : buildGeneratorPanel(node);
+        : cls === "SunsetLRPromptBuilder" ? buildLRPanel(node)
+          : buildGeneratorPanel(node);
 
   const root = built.root || makeRoot(node);
   if (!built.root) root.appendChild(el("div", "zs-head", "面板"));
@@ -1518,6 +1846,24 @@ function install(node) {
     });
   }
 
+  if (cls === "SunsetLRPromptBuilder") {
+    chain(node, "onExecuted", (out) => {
+      try {
+        const src = (typeof app !== "undefined" && app?.nodeOutputs
+          ? (app.nodeOutputs[String(node.id)] || app.nodeOutputs[node.id]) : null) || out || {};
+        const pickv = (k) => (Array.isArray(src?.[k]) ? src[k][0] : src?.[k]);
+        node.__zsLROut = {
+          zh: String(pickv("中文提示词") ?? ""),
+          en: String(pickv("英文提示词") ?? ""),
+          w: Number(pickv("推荐宽度") ?? 0) || 0,
+          h: Number(pickv("推荐高度") ?? 0) || 0,
+        };
+        built.sync?.();
+        relayout(node, node.__zsCtx?.root);
+      } catch (e) {  }
+    });
+  }
+
   let dm = null;
   if (typeof node.addDOMWidget === "function") {
     dm = node.addDOMWidget(DECK, "zimageui", root, {
@@ -1528,7 +1874,9 @@ function install(node) {
     if (dm) {
       dm.computeSize = () => [cls === "SunsetNSPromptSelector"
         ? Math.max(Number(node.size?.[0]) || CONFIG.width, NS_MIN_W)
-        : CONFIG.width, root.offsetHeight];
+        : cls === "SunsetLRPromptBuilder"
+          ? Math.max(Number(node.size?.[0]) || CONFIG.width, LR_MIN_W)
+          : CONFIG.width, root.offsetHeight];
       node.__zsDm = dm;
     }
   } else {
@@ -1584,7 +1932,7 @@ app.registerExtension({
           s[1].hidden = true;
         }
       }
-      if (nodeData?.name === "SunsetNSPromptSelector") {
+      if (nodeData?.name === "SunsetNSPromptSelector" || nodeData?.name === "SunsetLRPromptBuilder") {
         const tspec = req["触发词"];
         if (Array.isArray(tspec) && Array.isArray(tspec[0])) {
           NS_TRIGGERS = tspec[0].filter((x) => x !== "——");
@@ -1616,6 +1964,7 @@ app.registerExtension({
         install(node);
         ensureWearWidth(node);
         ensureNSWidth(node);
+        ensureLRWidth(node);
         node.__zsCtx?.sync?.();
         relayout(node, node.__zsCtx?.root);
       } catch (e) { console.warn("[ZImageSkin] 恢复节点失败", e); }
