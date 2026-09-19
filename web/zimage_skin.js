@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 
-const SKIN_VERSION = "1.1.0";
+const SKIN_VERSION = "1.1.1";
 
 const NODES = {
   ZImagePromptGeneratorNode: {
@@ -1596,6 +1596,15 @@ function lrApplyValues(node, vals) {
   node.__zsCtx?.sync?.();
 }
 
+function lrSetAllFields(node, value) {
+  const names = [];
+  for (const g of LR_GROUPS) names.push(...(g[1] || []));
+  for (const n of names) {
+    try { writeW(node, n, value); } catch (e) { }
+  }
+  node.__zsCtx?.sync?.();
+}
+
 function buildLRPresetBar(node) {
   const row = el("div", "zs-two");
   row.style.display = "grid";
@@ -1622,8 +1631,8 @@ function buildLRPresetBar(node) {
   const refresh = (pick) => {
     sel.textContent = "";
     const blank = el("option");
-    blank.value = "";
-    blank.textContent = "— 选择预设 —";
+    blank.value = "__default__";
+    blank.textContent = "默认（全部随机）";
     sel.appendChild(blank);
     for (const name of Object.keys(presets)) {
       const op = el("option");
@@ -1631,7 +1640,8 @@ function buildLRPresetBar(node) {
       op.textContent = name;
       sel.appendChild(op);
     }
-    sel.value = pick != null && Object.prototype.hasOwnProperty.call(presets, pick) ? pick : "";
+    const pickName = pick != null && Object.prototype.hasOwnProperty.call(presets, pick) ? pick : "__default__";
+    sel.value = pickName;
   };
   const load = async (pick) => {
     try {
@@ -1642,6 +1652,10 @@ function buildLRPresetBar(node) {
   };
   sel.addEventListener("change", () => {
     const name = sel.value;
+    if (name === "__default__") {
+      lrSetAllFields(node, "随机抽取");
+      return;
+    }
     if (name && presets[name]) lrApplyValues(node, presets[name]);
   });
   saveBtn.addEventListener("click", async () => {
@@ -1662,7 +1676,7 @@ function buildLRPresetBar(node) {
   });
   delBtn.addEventListener("click", async () => {
     const name = sel.value;
-    if (!name) return;
+    if (!name || name === "__default__") return;
     try {
       const r = await fetch(lrPresetAPI(), {
         method: "POST",
@@ -1707,6 +1721,22 @@ function buildLRPanel(node) {
   topRow.appendChild(roll);
   gTop.appendChild(topRow);
   gTop.appendChild(buildLRPresetBar(node));
+  const modeRow = el("div");
+  modeRow.style.display = "grid";
+  modeRow.style.gridTemplateColumns = "1fr 1fr";
+  modeRow.style.gap = "6px";
+  modeRow.style.marginTop = "6px";
+  const btnRnd = el("button", "zs-btn", "🎲 全部随机");
+  btnRnd.type = "button";
+  btnRnd.title = "92 项细分字段全部设为「随机抽取」（随机范围=局部微调/同主题重拍时围绕当前写真预设抽）";
+  btnRnd.addEventListener("click", () => lrSetAllFields(node, "随机抽取"));
+  const btnFollow = el("button", "zs-btn", "📌 跟随预设");
+  btnFollow.type = "button";
+  btnFollow.title = "92 项细分字段全部设为「跟随预设」，写真预设的具体值立刻生效";
+  btnFollow.addEventListener("click", () => lrSetAllFields(node, "跟随预设"));
+  modeRow.appendChild(btnRnd);
+  modeRow.appendChild(btnFollow);
+  gTop.appendChild(modeRow);
   body.appendChild(gTop);
 
   const gField = section("细化字段 · 92 项 · 点标签切换", "#8B2FF7");
