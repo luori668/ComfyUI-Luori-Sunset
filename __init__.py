@@ -7,7 +7,7 @@ from .nodes_zimage import (
 from .nodes_nsfw import SunsetNSPromptSelector
 from .nodes_lr import SunsetLRPromptBuilder
 
-__version__ = "1.0.6"
+__version__ = "1.1.0"
 
 NODE_CLASS_MAPPINGS = {
     "Krea2PromptPicker": Krea2PromptPicker,
