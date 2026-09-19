@@ -5,8 +5,9 @@ from .nodes_zimage import (
     ZImageFashionPresetLoaderNode,
 )
 from .nodes_nsfw import SunsetNSPromptSelector
+from .nodes_lr import SunsetLRPromptBuilder
 
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 
 NODE_CLASS_MAPPINGS = {
     "Krea2PromptPicker": Krea2PromptPicker,
@@ -14,6 +15,7 @@ NODE_CLASS_MAPPINGS = {
     "ZImagePromptLoaderNode": ZImagePromptLoaderNode,
     "ZImageFashionPresetLoaderNode": ZImageFashionPresetLoaderNode,
     "SunsetNSPromptSelector": SunsetNSPromptSelector,
+    "SunsetLRPromptBuilder": SunsetLRPromptBuilder,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -21,7 +23,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ZImagePromptGeneratorNode": "✨ 落日-提示词生成器",
     "ZImagePromptLoaderNode": "✨ 落日-提示词抽取器",
     "ZImageFashionPresetLoaderNode": "👗 落日-穿搭预设选择器",
-    "SunsetNSPromptSelector": "落日NS-提示词",
+    "SunsetNSPromptSelector": "落日提示词选择",
+    "SunsetLRPromptBuilder": "落日提示词预设",
 }
 
 WEB_DIRECTORY = "./web"
