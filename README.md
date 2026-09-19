@@ -3,16 +3,8 @@
 > 落日系列 · 提示词节点合集（Krea2 + Z-image）
 
 把两个本地在用的提示词插件融合成一个：**一套词库、六个节点、零依赖**（no dependencies）。
-原生控件收进折叠面板，画布更干净；画布搜索：落日即能看到六个节点。
+原生控件收进折叠面板，画布更干净；画布搜索「落日」即可看到六个节点。
 
-
-## 新增内容： 「致谢与转载说明」
-
-- **落日提示词预设—— 原作者/仓库/许可证 + 你这边做的改动清单（内联 resolution、去注释、词库迁移、8 标签面板、预设存取、默认值改随机），并声明生成逻辑未改动
-- **原作者插件仓库：https://github.com/VividMuse-AGI/ComfyUI-Z-Image-Prompt-Builder
-- **落日提示词选择（NS 节点）—— weekii8282/ComfyUI-NSFW-PromptSelector，只改 UI
-- **大呲花 / KOOK 词库 —— 公开词库，感谢大佬们。
-- **顺手把之前缺的两个节点（落日提示词选择、落日提示词预设）补进了「节点一览」表格。
 
 ---
 
@@ -34,6 +26,8 @@
 | `ZImagePromptGeneratorNode` | ✨ 落日-提示词生成器 | 按分类/模式生成完整提示词 |
 | `ZImagePromptLoaderNode` | ✨ 落日-提示词抽取器 | 超强模式 / 随机模式 / 单分类，三选一 |
 | `ZImageFashionPresetLoaderNode` | 👗 落日-穿搭预设选择器 | 45 套穿搭预设（含「随机」） |
+| `SunsetNSPromptSelector` | 落日提示词选择 | NS 方向提示词选择（正面 / 负面 / 完整） |
+| `SunsetLRPromptBuilder` | 落日提示词预设 | 92 项写真字段 + 预设保存，中英文双语输出 |
 
 
 ## 用法
@@ -58,4 +52,29 @@
 - 平台：Windows / Linux / macOS 通用，无平台相关代码
 - Python：`>= 3.9`
 
-词库与节点结构源自本机在用的 Krea2 / Z-image 提示词插件。
+
+## 致谢与转载说明
+
+本仓库部分代码与词库移植自第三方开源项目，版权归原作者所有，在此一并致谢。
+
+### 落日提示词预设（SunsetLRPromptBuilder）
+
+- 原作者：VividMuse-AGI
+- 原仓库：<https://github.com/VividMuse-AGI/ComfyUI-Z-Image-Prompt-Builder>
+- 原许可证：MIT License
+- 本仓库的修改：`resolution.py` 内联为单文件；去除代码注释；词库迁移至 `data/lr/`（9 个 JSON 内容未改动）；界面重排为 8 标签分页面板；新增预设保存/恢复与运行结果回显；92 项字段默认值改为「随机抽取」。
+- 提示词生成逻辑未改动。`nodes_lr.py` 头部保留原始 MIT 归属声明，转载时请勿删除。
+
+### 落日提示词选择（SunsetNSPromptSelector）
+
+- 原作者：weekii8282
+- 原仓库：<https://github.com/weekii8282/ComfyUI-NSFW-PromptSelector>
+- 本仓库的修改：仅调整布局外观与面板 UI，核心逻辑未改动。
+
+### 大呲花 / KOOK 词库（data/krea2/）
+
+- 来自社区整理的公开词库（`part-hz1.json` / `part-hz2.json`），仅做格式转换与清洗，感谢原作者。
+
+---
+
+二次发布请保留以上项目链接与 MIT 声明；如原作者希望调整或移除相关内容，请提 Issue，会第一时间处理。
