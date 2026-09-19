@@ -9,7 +9,7 @@
 ## 新增内容： 「致谢与转载说明」
 
 - **落日提示词预设—— 原作者/仓库/许可证 + 你这边做的改动清单（内联 resolution、去注释、词库迁移、8 标签面板、预设存取、默认值改随机），并声明生成逻辑未改动
-- **原作者节点：https://github.com/VividMuse-AGI/ComfyUI-Z-Image-Prompt-Builder
+- **原作者插件仓库：https://github.com/VividMuse-AGI/ComfyUI-Z-Image-Prompt-Builder
 - **落日提示词选择（NS 节点）—— weekii8282/ComfyUI-NSFW-PromptSelector，只改 UI
 - **大呲花 / KOOK 词库 —— 公开词库，感谢大佬们。
 - **顺手把之前缺的两个节点（落日提示词选择、落日提示词预设）补进了「节点一览」表格。
