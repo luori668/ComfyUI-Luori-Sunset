@@ -178,8 +178,7 @@ function injectCSS() {
   --bgtop:#191134; --bgbtm:#100B1F;
   --ln:${THEME.ln}; --tx:${THEME.tx}; --dim:${THEME.dim};
   box-sizing:border-box; width:100%; padding:${CONFIG.panelPad}px;
-  /* 高度必须由内容决定：ComfyUI 会给这个元素加 h-full 类，
-     一旦跟着父盒子走 → 面板被压扁 → 内容被裁。!important 用来压过 h-full */
+  
   height:auto !important; min-height:0; overflow:hidden;
   font:12px/1.45 "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
   color:var(--tx); border-radius:12px;
@@ -207,7 +206,7 @@ function injectCSS() {
 .zs-chip.hot{color:#FFD8A8;border-color:rgba(255,138,61,.4);background:rgba(255,138,61,.1);}
 .zs-chip.zero{color:#FF9BAE;border-color:rgba(255,61,113,.4);background:rgba(255,61,113,.09);}
 
-/* 分组：左侧一条主题色竖条 */
+
 .zs-grp{margin-top:9px;}
 .zs-gh{display:flex;align-items:center;gap:7px;margin:0 0 7px;
   font-size:9.5px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;}
@@ -252,7 +251,7 @@ function injectCSS() {
   background:rgba(29,158,117,.13);}
 
 
-/* 下拉：外面套一层壳，好看又能放箭头 */
+
 .zs-field{position:relative;display:flex;align-items:center;height:30px;border-radius:8px;
   border:1px solid rgba(255,255,255,.1);
   background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018));
@@ -267,7 +266,7 @@ function injectCSS() {
   color:var(--dim);pointer-events:none;}
 .zs-field select option{background:#191134;color:#EDE9FE;}
 
-/* 细节级别：5 段进度条 */
+
 .zs-seg{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;height:30px;}
 .zs-seg b{display:flex;align-items:center;justify-content:center;border-radius:7px;
   font:600 10px/1 inherit;color:var(--dim);cursor:pointer;user-select:none;
@@ -278,7 +277,7 @@ function injectCSS() {
   background:linear-gradient(150deg,var(--c1),var(--c2));
   box-shadow:0 3px 12px rgba(255,46,147,.4);}
 
-/* 开关 */
+
 .zs-flags{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
 .zs-sw{position:relative;display:flex;align-items:center;gap:7px;height:29px;padding:0 8px;
   border-radius:8px;cursor:pointer;font-size:10.5px;color:var(--dim);user-select:none;
@@ -299,16 +298,16 @@ function injectCSS() {
   0%,100%{box-shadow:0 0 0 1px rgba(255,61,113,.35),0 0 14px rgba(255,61,113,.35)}
   50%{box-shadow:0 0 0 1px rgba(255,61,113,.9),0 0 22px rgba(255,61,113,.75)}}
 
-/* 分类方块 */
+
 .zs-cats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
-.zs-cat{position:relative;height:46px;padding:0;border-radius:9px;cursor:pointer;overflow:hidden;
+.zs-cat{position:relative;height:60px;padding:0;border-radius:8px;cursor:pointer;overflow:hidden;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   border:1px solid rgba(255,255,255,.1);color:var(--dim);
   background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.015));
-  font:600 10.5px/1.15 inherit;
+  font:600 10.5px/1 inherit;
   transition:transform .16s cubic-bezier(.4,0,.2,1),color .16s,border-color .16s;}
-.zs-cat .zs-sym{font-size:13px;font-weight:800;}
-.zs-cat .zs-nm{letter-spacing:.02em;max-width:96%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.zs-cat .zs-sym{font-size:13px;font-weight:800;line-height:1;}
+.zs-cat .zs-nm{font-size:10.5px;letter-spacing:.02em;line-height:1.2;max-width:96%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .zs-cat .zs-n{font:700 8.5px/1 Consolas,monospace;opacity:.6;}
 .zs-cat:hover{transform:translateY(-1px);color:#fff;border-color:var(--c);}
 .zs-cat:active{transform:translateY(0) scale(.97);}
@@ -329,7 +328,7 @@ function injectCSS() {
 .zs-cat.zs-danger.on::before{background:none;}
 @keyframes zsspin{to{--zsa:360deg;}}
 
-/* 超强模式大按钮 */
+
 .zs-mega{position:relative;width:100%;height:46px;border-radius:10px;cursor:pointer;overflow:hidden;
   border:1px solid rgba(255,255,255,.12);color:var(--dim);
   background:linear-gradient(180deg,rgba(255,208,138,.06),rgba(255,255,255,.015));
@@ -348,51 +347,45 @@ function injectCSS() {
   -webkit-mask-composite:xor;mask-composite:exclude;
   animation:zsspin 3s linear infinite;pointer-events:none;}
 
-/* 种子行 —— 一行四件：标签 / 数字 / 随机按钮 / 状态胶囊（固定·随机，靠 margin-left:auto 顶到最右）。
-   行内四件的伸缩权限是刻意配的：标签、按钮、胶囊一律 flex:0 0 auto 不许被压缩，
-   只有数字框能收缩，且收缩时用省略号降级 —— 这样 15~20 位的长种子最坏也只是
-   "数字尾巴变省略号"，绝不会把邻居挤变形或压到按钮上。 */
+
 .zs-seedrow{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;margin-top:9px;padding:7px 8px;
   border-radius:9px;border:1px solid rgba(255,255,255,.09);background:rgba(0,0,0,.22);}
-/* 标签用缩写 "S"（完整词靠 title 提示）：只在窄节点下生效。节点被拖到 270px 时
-   行内可用宽仅 84px，写全 "SEED" 要多吃 ~20px，14 位种子就放不下了。 */
+
 .zs-seedrow .zs-lbl{flex:0 0 auto;font-size:9px;letter-spacing:.14em;color:var(--dim);
-  text-transform:uppercase;cursor:help;}
-.zs-seedrow .zs-num{flex:0 1 auto;font:700 13px/1 Consolas,monospace;color:#FFD08A;letter-spacing:.04em;
-  min-width:56px;text-align:center;padding:3px 6px;border-radius:6px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  text-transform:uppercase;cursor:pointer;user-select:none;border-radius:4px;padding:2px 4px;}
+.zs-seedrow .zs-lbl:hover{color:#FF9A5C;background:rgba(255,138,61,.1);}
+.zs-seedrow .zs-seedin{flex:1 1 auto;min-width:0;height:22px;padding:0 8px;
+  border-radius:6px;font:700 12px/1 Consolas,monospace;color:#FFD08A;letter-spacing:.04em;
+  text-align:center;outline:none;user-select:text;
   background:rgba(255,208,138,.08);border:1px solid rgba(255,208,138,.22);}
+.zs-seedrow .zs-seedin:focus{border-color:rgba(255,208,138,.55);box-shadow:0 0 0 2px rgba(255,208,138,.18);}
+.zs-seedrow .zs-seedin.zs-onfixed{color:#FFE0B0;border-color:rgba(255,208,138,.45);
+  background:rgba(255,208,138,.12);}
 .zs-seedrow .zs-mini{flex:0 0 auto;height:22px;padding:0 8px;border-radius:6px;cursor:pointer;
   font:700 10px/1 inherit;color:var(--dim);border:1px solid rgba(255,255,255,.12);
   background:rgba(255,255,255,.03);}
 .zs-seedrow .zs-mini:hover{color:#fff;border-color:rgba(255,138,61,.55);}
-/* 窄节点时藏掉「随机」胶囊按钮，把空间留给种子数字。
-   功能不丢：左边的 S 标签本身就是"点一下换随机数"的按钮，且它不吃额外宽度。
-   阈值 300px 按实测定（270 窄 / 400 宽）—— 正常不会触发（穿搭节点已被
-   ensureWearWidth 抬到 400），这是用户手动拖窄时的兜底。 */
+
 .zs-seedrow.zs-narrow{position:relative;}
 .zs-seedrow.zs-narrow .zs-mini{display:none;}
 .zs-seedrow.zs-narrow .zs-lbl{cursor:pointer;color:#FF9A5C;border-radius:4px;
   padding:2px 5px;background:rgba(255,138,61,.1);
   border:1px solid rgba(255,138,61,.28);}
 .zs-seedrow.zs-narrow .zs-lbl:hover{color:#fff;background:rgba(255,138,61,.22);}
-/* ⚠ 状态类名必须带 zs- 前缀！宿主页面（ComfyUI 用的是 Tailwind 工具类）里
-   存在一批"裸类名"，挂到任何元素上都会立刻改布局，实测有效的是：
-     .fixed{position:fixed;min-width:0;min-height:0}  .hidden{display:none}
-     .relative .absolute .sticky（改 position）/ .flex .grid .table（改 display）
-     .grow{flex-grow:1}  .truncate{overflow:hidden;white-space:nowrap}
-   反面教材（2026-09-16 修的 bug）：.zs-tag 在"固定态"加了裸的 fixed 类，
-   position 被顶成 fixed → 胶囊被踢出 flex 流、按视口定位，正好砸在左边的
-   SEED 标签上，看起来就是"种子行重叠了"。现在改成 zs-fixed，并在基础样式里
-   显式钉住 position/min-width（选择器权重 0,2,0 > 工具类的 0,1,0，双保险）。 */
-.zs-seedrow .zs-tag{flex:0 0 auto;margin-left:auto;position:static;min-width:auto;min-height:auto;
-  font:700 9.5px/1 Consolas,monospace;letter-spacing:.06em;
-  color:#7DE3C0;border:1px solid rgba(125,227,192,.3);background:rgba(125,227,192,.08);
-  padding:3px 7px;border-radius:99px;}
-.zs-seedrow .zs-tag.zs-fixed{color:#FFD08A;border-color:rgba(255,208,138,.35);
-  background:rgba(255,208,138,.09);}
 
-/* 触发词 */
+.zs-seedrow .zs-fixbtn{flex:0 0 auto;margin-left:auto;position:static;min-width:auto;min-height:auto;
+  height:22px;padding:0 8px;border-radius:99px;cursor:pointer;user-select:none;
+  font:700 9.5px/1 Consolas,monospace;letter-spacing:.04em;
+  color:#7DE3C0;border:1px solid rgba(125,227,192,.3);background:rgba(125,227,192,.08);}
+.zs-seedrow .zs-fixbtn.zs-fixed{color:#FFD08A;border-color:rgba(255,208,138,.35);
+  background:rgba(255,208,138,.09);}
+.zs-seedrow .zs-fixbtn:hover{filter:brightness(1.25);}
+.zs-seedrow .zs-fixbtn:active{transform:translateY(1px);}
+.zs-seedrow .zs-fixbtn.zs-pending{color:#2A1A00;background:#FFD08A;border-color:#FFD08A;
+  animation:zspending 1s ease-in-out infinite;}
+@keyframes zspending{0%,100%{opacity:1}50%{opacity:.5}}
+
+
 .zs-trig{margin-top:9px;padding:8px;border-radius:9px;
   border:1px solid rgba(255,255,255,.09);background:rgba(0,0,0,.2);}
 .zs-ta{width:100%;height:44px;margin-top:6px;padding:6px 8px;border-radius:7px;resize:none;
@@ -401,7 +394,7 @@ function injectCSS() {
 .zs-ta:focus{border-color:rgba(255,138,61,.55);}
 .zs-ta::placeholder{color:#5F5880;}
 
-/* 穿搭预览卡 */
+
 .zs-pcard{margin-top:9px;padding:10px;border-radius:10px;
   border:1px solid rgba(255,255,255,.11);
   background:linear-gradient(160deg,rgba(255,46,147,.16),rgba(255,255,255,.02));}
@@ -793,25 +786,71 @@ const SEEDROW_NARROW = 300;
 function makeSeedRow(node) {
   const row = el("div", "zs-seedrow");
   const lbl = el("span", "zs-lbl", "SEED");
-  lbl.title = "点一下换一个随机种子";
+  lbl.title = "点标签＝选中左边输入框，可直接手填种子";
   row.appendChild(lbl);
-  const num = el("span", "zs-num", "0");
+
+  const preview = { v: Number(readW(node, "seed", 0)) || 0 };
+
+  const num = el("input", "zs-seedin");
+  num.type = "text";
+  num.inputMode = "numeric";
+  num.spellcheck = false;
+  num.value = String(preview.v);
+  num.title = "当前值：可直接手填；填完点右边按钮才会写进 seed";
   row.appendChild(num);
+
   const btn = el("button", "zs-mini", "随机");
   btn.type = "button";
-  const tag = el("span", "zs-tag", "随机");
+  btn.title = "换一颗随机值填进左边（只换预览，不写进 seed）";
+  row.appendChild(btn);
 
-  const roll = () => {
-    writeW(node, "seed", Math.floor(Math.random() * 4294967295));
+  const tag = el("button", "zs-fixbtn", "随机中");
+  tag.type = "button";
+  row.appendChild(tag);
+
+  const stopEvt = (e) => {
+    if (!e) return;
+    try { e.preventDefault(); } catch (_) { }
+    try { e.stopPropagation(); } catch (_) { }
+    try { e.stopImmediatePropagation && e.stopImmediatePropagation(); } catch (_) { }
+  };
+  const onDown = (e) => { stopEvt(e); };
+  const onClick = (fn) => (e) => { stopEvt(e); fn(); };
+  const syncNode = () => {
     if (typeof node.__zsCtx?.sync === "function") node.__zsCtx.sync();
   };
-  btn.addEventListener("click", roll);
-  lbl.addEventListener("click", () => {
-    if (row.classList.contains("zs-narrow")) roll();
-  });
 
-  row.appendChild(btn);
-  row.appendChild(tag);
+  num.addEventListener("input", () => {
+    const raw = String(num.value || "").replace(/[^\d]/g, "");
+    preview.v = Math.min(4294967295, parseInt(raw || "0", 10) || 0);
+    paint(true);
+  });
+  ["pointerdown", "mousedown", "wheel", "keydown", "keyup", "dblclick", "contextmenu"].forEach((t) =>
+    num.addEventListener(t, (e) => { try { e.stopPropagation(); } catch (_) { } }));
+
+  btn.addEventListener("pointerdown", onDown, true);
+  btn.addEventListener("mousedown", onDown, true);
+  btn.addEventListener("click", onClick(() => {
+    preview.v = Math.floor(Math.random() * 4294967295);
+    paint(true);
+  }));
+
+  tag.addEventListener("pointerdown", onDown, true);
+  tag.addEventListener("mousedown", onDown, true);
+  tag.addEventListener("click", onClick(() => {
+    const w = Number(readW(node, "seed", 0)) || 0;
+    if (w > 0) {
+      writeW(node, "seed", 0);
+      preview.v = 0;
+    } else {
+      writeW(node, "seed", preview.v || 0);
+    }
+    syncNode();
+  }));
+
+  lbl.addEventListener("click", onClick(() => {
+    try { num.focus(); num.select(); } catch (_) { }
+  }));
 
   const layout = () => {
     const w = Number(node?.size?.[0]) || 0;
@@ -819,13 +858,24 @@ function makeSeedRow(node) {
     lbl.textContent = row.classList.contains("zs-narrow") ? "S" : "SEED";
   };
 
-  const paint = () => {
+  const paint = (keepPreview) => {
     layout();
-    const v = Number(readW(node, "seed", 0)) || 0;
-    num.textContent = v > 0 ? String(v) : "0";
-    tag.textContent = v > 0 ? "固定" : "随机";
-    tag.classList.toggle("zs-fixed", v > 0);
+    const w = Number(readW(node, "seed", 0)) || 0;
+    if (w > 0 && !keepPreview) preview.v = w;
+    if (document.activeElement !== num) num.value = String(preview.v);
+    const fixed = w > 0;
+    const pending = fixed && preview.v !== w;
+    tag.textContent = pending ? "点我固定" : fixed ? "已固定" : "随机中";
+    tag.classList.toggle("zs-fixed", fixed && !pending);
+    tag.classList.toggle("zs-pending", pending);
+    num.classList.toggle("zs-onfixed", fixed);
+    tag.title = pending
+      ? `当前已固定 ${w}，左边是新值 ${preview.v}\n点一下把 ${preview.v} 设为新种子`
+      : fixed
+        ? `已锁定种子 ${w}\n点一下解锁（seed 归 0，每次运行重新随机）`
+        : `未固定（seed=0，每次运行随机）\n点一下把 ${preview.v} 锁定为固定种子`;
   };
+
   paint();
   row.__paint = paint;
   return row;
