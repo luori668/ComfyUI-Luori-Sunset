@@ -789,19 +789,17 @@ function makeSeedRow(node) {
   lbl.title = "点标签＝选中左边输入框，可直接手填种子";
   row.appendChild(lbl);
 
-  const preview = { v: Number(readW(node, "seed", 0)) || 0 };
-
   const num = el("input", "zs-seedin");
   num.type = "text";
   num.inputMode = "numeric";
   num.spellcheck = false;
-  num.value = String(preview.v);
-  num.title = "当前值：可直接手填；填完点右边按钮才会写进 seed";
+  num.value = String(Number(readW(node, "seed", 0)) || 0);
+  num.title = "种子值：可直接手填；随机模式下每次运行会自动换";
   row.appendChild(num);
 
   const btn = el("button", "zs-mini", "随机");
   btn.type = "button";
-  btn.title = "换一颗随机值填进左边（只换预览，不写进 seed）";
+  btn.title = "立刻换一颗随机种子";
   row.appendChild(btn);
 
   const tag = el("button", "zs-fixbtn", "随机中");
@@ -820,10 +818,30 @@ function makeSeedRow(node) {
     if (typeof node.__zsCtx?.sync === "function") node.__zsCtx.sync();
   };
 
+  const ctrlOf = () => (node.widgets || []).find((w) => w.name === "control_after_generate") || null;
+  const isFixed = () => {
+    const c = ctrlOf();
+    if (c) return c.value === "fixed";
+    return (Number(readW(node, "seed", 0)) || 0) > 0;
+  };
+  const setFixed = (on) => {
+    const c = ctrlOf();
+    if (c) {
+      const v = on ? "fixed" : "randomize";
+      if (c.value !== v) {
+        c.value = v;
+        try { c.callback?.(v, app.canvas, node); } catch (_) { }
+      }
+      return;
+    }
+    const cur = Number(readW(node, "seed", 0)) || 0;
+    writeW(node, "seed", on ? (cur || Math.floor(Math.random() * 4294967295)) : 0);
+  };
+
   num.addEventListener("input", () => {
     const raw = String(num.value || "").replace(/[^\d]/g, "");
-    preview.v = Math.min(4294967295, parseInt(raw || "0", 10) || 0);
-    paint(true);
+    writeW(node, "seed", Math.min(4294967295, parseInt(raw || "0", 10) || 0));
+    paint();
   });
   ["pointerdown", "mousedown", "wheel", "keydown", "keyup", "dblclick", "contextmenu"].forEach((t) =>
     num.addEventListener(t, (e) => { try { e.stopPropagation(); } catch (_) { } }));
@@ -831,20 +849,15 @@ function makeSeedRow(node) {
   btn.addEventListener("pointerdown", onDown, true);
   btn.addEventListener("mousedown", onDown, true);
   btn.addEventListener("click", onClick(() => {
-    preview.v = Math.floor(Math.random() * 4294967295);
-    paint(true);
+    writeW(node, "seed", Math.floor(Math.random() * 4294967295));
+    paint();
   }));
 
   tag.addEventListener("pointerdown", onDown, true);
   tag.addEventListener("mousedown", onDown, true);
   tag.addEventListener("click", onClick(() => {
-    const w = Number(readW(node, "seed", 0)) || 0;
-    if (w > 0) {
-      writeW(node, "seed", 0);
-      preview.v = 0;
-    } else {
-      writeW(node, "seed", preview.v || 0);
-    }
+    setFixed(!isFixed());
+    paint();
     syncNode();
   }));
 
@@ -858,22 +871,17 @@ function makeSeedRow(node) {
     lbl.textContent = row.classList.contains("zs-narrow") ? "S" : "SEED";
   };
 
-  const paint = (keepPreview) => {
+  const paint = () => {
     layout();
-    const w = Number(readW(node, "seed", 0)) || 0;
-    if (w > 0 && !keepPreview) preview.v = w;
-    if (document.activeElement !== num) num.value = String(preview.v);
-    const fixed = w > 0;
-    const pending = fixed && preview.v !== w;
-    tag.textContent = pending ? "点我固定" : fixed ? "已固定" : "随机中";
-    tag.classList.toggle("zs-fixed", fixed && !pending);
-    tag.classList.toggle("zs-pending", pending);
+    const v = Number(readW(node, "seed", 0)) || 0;
+    if (document.activeElement !== num) num.value = String(v);
+    const fixed = isFixed();
+    tag.textContent = fixed ? "已固定" : "随机中";
+    tag.classList.toggle("zs-fixed", fixed);
     num.classList.toggle("zs-onfixed", fixed);
-    tag.title = pending
-      ? `当前已固定 ${w}，左边是新值 ${preview.v}\n点一下把 ${preview.v} 设为新种子`
-      : fixed
-        ? `已锁定种子 ${w}\n点一下解锁（seed 归 0，每次运行重新随机）`
-        : `未固定（seed=0，每次运行随机）\n点一下把 ${preview.v} 锁定为固定种子`;
+    tag.title = fixed
+      ? `已锁定：每次运行都用种子 ${v}\n点一下切回随机（每次运行自动换）`
+      : `随机中：每次运行自动换种子\n点一下锁定当前值 ${v}`;
   };
 
   paint();
