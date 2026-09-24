@@ -543,13 +543,12 @@ function buildPanel(node) {
   seedInput.type = "text";
   seedInput.inputMode = "numeric";
   seedInput.spellcheck = false;
-  seedInput.title = "当前值：可直接手填；填完点右边按钮才会写进 seed";
-  const preview = { v: Number(readW(node, W_NAME.seed, 0)) || 0 };
-  seedInput.value = String(preview.v);
+  seedInput.title = "种子值：可直接手填；随机模式下每次运行会自动换";
+  seedInput.value = String(Number(readW(node, W_NAME.seed, 0)) || 0);
   seedInput.addEventListener("input", () => {
     const raw = String(seedInput.value || "").replace(/[^\d]/g, "");
-    preview.v = Math.min(4294967295, parseInt(raw || "0", 10) || 0);
-    paintSeed(true);
+    writeW(node, W_NAME.seed, Math.min(4294967295, parseInt(raw || "0", 10) || 0));
+    paintSeed();
   });
   ["pointerdown", "mousedown", "wheel", "keydown", "keyup", "dblclick", "contextmenu"].forEach((t) =>
     seedInput.addEventListener(t, (e) => { try { e.stopPropagation(); } catch (_) { } }));
@@ -561,15 +560,35 @@ function buildPanel(node) {
     try { e.stopImmediatePropagation && e.stopImmediatePropagation(); } catch (_) { }
   };
 
+  const ctrlOf = () => (node.widgets || []).find((w) => w.name === "control_after_generate") || null;
+  const isFixed = () => {
+    const c = ctrlOf();
+    if (c) return c.value === "fixed";
+    return (Number(readW(node, W_NAME.seed, 0)) || 0) > 0;
+  };
+  const setFixed = (on) => {
+    const c = ctrlOf();
+    if (c) {
+      const v = on ? "fixed" : "randomize";
+      if (c.value !== v) {
+        c.value = v;
+        try { c.callback?.(v, app.canvas, node); } catch (_) { }
+      }
+      return;
+    }
+    const cur = Number(readW(node, W_NAME.seed, 0)) || 0;
+    writeW(node, W_NAME.seed, on ? (cur || Math.floor(Math.random() * 0xFFFFFFFF)) : 0);
+  };
+
   const btnRoll = el("button", "k2-mini", "\u21BB 随机");
   btnRoll.type = "button";
-  btnRoll.title = "换一颗随机值填进左边（只换预览，不写进 seed）";
+  btnRoll.title = "立刻换一颗随机种子";
   btnRoll.addEventListener("pointerdown", (e) => stopEvt(e), true);
   btnRoll.addEventListener("mousedown", (e) => stopEvt(e), true);
   btnRoll.addEventListener("click", (e) => {
     stopEvt(e);
-    preview.v = Math.floor(Math.random() * 0xFFFFFFFF);
-    paintSeed(true);
+    writeW(node, W_NAME.seed, Math.floor(Math.random() * 0xFFFFFFFF));
+    paintSeed();
   });
 
   const seedTag = el("button", "k2-seedtag", "随机中");
@@ -578,34 +597,24 @@ function buildPanel(node) {
   seedTag.addEventListener("mousedown", (e) => stopEvt(e), true);
   seedTag.addEventListener("click", (e) => {
     stopEvt(e);
-    const w = Number(readW(node, W_NAME.seed, 0)) || 0;
-    if (w > 0) {
-      writeW(node, W_NAME.seed, 0);
-      preview.v = 0;
-    } else {
-      writeW(node, W_NAME.seed, preview.v || 0);
-    }
+    setFixed(!isFixed());
+    paintSeed();
     sync();
   });
   seedWrap.append(seedInput, btnRoll, seedTag);
   body.appendChild(seedWrap);
 
-  function paintSeed(keepPreview) {
+  function paintSeed() {
     const w = Number(readW(node, W_NAME.seed, 0)) || 0;
-    if (w > 0 && !keepPreview) preview.v = w;
-    if (document.activeElement !== seedInput) seedInput.value = String(preview.v);
-    const fixed = w > 0;
-    const pending = fixed && preview.v !== w;
-    seedTag.textContent = pending ? "点我固定" : fixed ? "已固定" : "随机中";
-    seedTag.classList.toggle("k2-fix", fixed && !pending);
-    seedTag.classList.toggle("k2-pending", pending);
+    if (document.activeElement !== seedInput) seedInput.value = String(w);
+    const fixed = isFixed();
+    seedTag.textContent = fixed ? "已固定" : "随机中";
+    seedTag.classList.toggle("k2-fix", fixed);
     seedTag.classList.toggle("k2-rand", !fixed);
     seedInput.classList.toggle("k2-onfixed", fixed);
-    seedTag.title = pending
-      ? `当前已固定 ${w}，左边是新值 ${preview.v}\n点一下把 ${preview.v} 设为新种子`
-      : fixed
-        ? `已锁定种子 ${w}\n点一下解锁（seed 归 0，每次运行重新随机）`
-        : `未固定（seed=0，每次运行随机）\n点一下把 ${preview.v} 锁定为固定种子`;
+    seedTag.title = fixed
+      ? `已锁定：每次运行都用种子 ${w}\n点一下切回随机（每次运行自动换）`
+      : `随机中：每次运行自动换种子\n点一下锁定当前值 ${w}`;
   }
 
   const adv = el("details", "k2-adv");
