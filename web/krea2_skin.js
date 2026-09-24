@@ -42,8 +42,7 @@ const partName = (i) => `提示词${i}`;
 const PART_SIZES = [500, 500, 500, 500, 500, 500, 500, 500, 491, 247, 247, 1662];
 const PART_TOTAL = PART_SIZES.reduce((a, b) => a + b, 0);
 
-/* 汇总词库（清洗去重后的条数，与运行时一致）
-   大呲花 = part-hz1.json，KOOK = part-hz2.json，两者互相独立 */
+
 const HZ1_SIZE = 13430;
 const HZ2_SIZE = 391;
 
@@ -100,8 +99,7 @@ function injectCSS() {
   --cy:${THEME.cyan};  --dg:${THEME.danger};
   --ln:rgba(255,255,255,.09); --tx:#EDE9FE; --dim:#9A90C4;
   box-sizing:border-box; width:100%; padding:10px;
-  /* 高度必须由内容决定：ComfyUI 会给这个元素加上 h-full(height:100%) 类，
-     一旦跟着父盒子走 → 面板被压扁 → 内容被裁掉。!important 用来压过 h-full */
+  
   height:auto !important; min-height:0; overflow:visible;
   font:12px/1.45 "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
   color:var(--tx); border-radius:12px;
@@ -114,11 +112,10 @@ function injectCSS() {
 }
 .k2-root *{box-sizing:border-box;}
 
-/* 纯内容层：高度永远是内容自然高度，不受任何容器约束。
-   尺寸测量的唯一依据 —— 千万别在它身上加 height/flex-shrink。 */
+
 .k2-body{display:flex;flex-direction:column;flex:0 0 auto;width:100%;}
 
-/* ── 顶部品牌条 ─────────────────────────────────────────────── */
+
 .k2-head{display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--ln);}
 .k2-dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;
   background:var(--o);box-shadow:0 0 9px var(--o);animation:k2pulse 2.6s ease-in-out infinite;}
@@ -131,36 +128,36 @@ function injectCSS() {
   border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.035);
   transition:color .18s,border-color .18s,background .18s,box-shadow .18s;}
 
-/* ── 分区标题 ───────────────────────────────────────────────── */
+
 .k2-sech{display:flex;align-items:center;gap:8px;margin:9px 0 6px;
   font-size:9.5px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;}
 .k2-sech::after{content:"";flex:1;height:1px;
   background:linear-gradient(90deg,rgba(255,138,61,.55),rgba(139,47,247,.15),transparent);}
 
-/* ── 杂项：特殊模式区里的第三个方块（占满一行） ─────────────── */
+
 .k2-big.k2-wide{grid-column:1 / -1;}
 .k2-big .k2-badge{position:absolute;top:6px;right:8px;padding:2px 7px;border-radius:99px;
   font:700 9.5px/1.35 inherit;letter-spacing:.04em;
   border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.22);color:var(--dim);
   transition:color .18s,border-color .18s,background .18s;}
 .k2-big.on .k2-badge{color:#fff;border-color:rgba(255,255,255,.34);background:rgba(0,0,0,.2);}
-/* 窄按钮（KOOK/大呲花）：条数不悬在角上，改成跟标题同一行的小胶囊，永不重叠 */
+
 .k2-toprow{display:flex;align-items:center;gap:5px;max-width:100%;}
 .k2-count{font:600 8.5px/1.2 inherit;letter-spacing:.02em;white-space:nowrap;
   color:var(--dim);padding:2px 6px;border-radius:99px;
   border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.22);
   transition:color .18s,border-color .18s;}
 .k2-big.on .k2-count{color:#fff;border-color:rgba(255,255,255,.3);}
-/* 点亮时走"落日"渐变，跟中文模式的青、NSFW 的红区分开 */
+
 .k2-big.k2-src.on{border-color:transparent;
   background:linear-gradient(115deg,var(--o),var(--p) 55%,var(--v));
   box-shadow:0 5px 18px rgba(255,46,147,.4),inset 0 0 0 1px rgba(255,255,255,.18);}
 .k2-big.k2-src.on .k2-badge{color:#fff;border-color:rgba(255,255,255,.34);background:rgba(0,0,0,.2);}
-/* 半选：展开「细分 12 源」后只开了其中几个 */
+
 .k2-big.k2-part{color:#FFD8A8;border-color:rgba(255,138,61,.5);background:rgba(255,138,61,.09);}
 .k2-big.k2-part .k2-badge{color:#FFD8A8;border-color:rgba(255,216,168,.4);}
 
-/* ── 细分 12 源（默认收起） ─────────────────────────────────── */
+
 .k2-more{margin-top:6px;}
 .k2-more>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;
   font-size:9.5px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;
@@ -171,7 +168,7 @@ function injectCSS() {
 .k2-more>summary:hover{color:var(--tx);}
 .k2-morebody{margin-top:7px;}
 
-/* ── 12 宫格磁贴（只在细分区里出现） ────────────────────────── */
+
 .k2-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
 .k2-tile{position:relative;height:40px;padding:0;border-radius:9px;cursor:pointer;
   border:1px solid rgba(255,255,255,.1);
@@ -194,13 +191,12 @@ function injectCSS() {
   animation:k2spin 3.4s linear infinite;pointer-events:none;}
 @keyframes k2spin{to{--k2a:360deg;}}
 
-/* ── 特殊模式：6 列网格
-      第一行 3 个键各占 2 列（=1/3 宽），第二行 2 个键各占 3 列（=1/2 宽） ── */
+
 .k2-duo{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
 .k2-duo .k2-big{font-size:10.5px;}
 .k2-duo .k2-big .k2-sym{font-size:13px;}
-.k2-big.k2-th{grid-column:span 2;}      /* 第一行：ZH / 18+ / KOOK */
-.k2-big.k2-half{grid-column:span 3;}    /* 第二行：MISC / 大呲花 */
+.k2-big.k2-th{grid-column:span 2;}      
+.k2-big.k2-half{grid-column:span 3;}    
 .k2-big{position:relative;height:44px;padding:0;border-radius:10px;cursor:pointer;
   border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);
   color:var(--dim);font:600 11.5px/1.3 inherit;
@@ -212,12 +208,7 @@ function injectCSS() {
 .k2-big.on{color:#fff;border-color:rgba(34,211,238,.6);
   background:linear-gradient(180deg,rgba(34,211,238,.22),rgba(34,211,238,.05));
   box-shadow:0 0 15px rgba(34,211,238,.3),inset 0 0 0 1px rgba(34,211,238,.2);}
-/* ── 选中态的光效 ────────────────────────────────────────────────
-   走马灯 = 一段光沿着边框绕圈跑。做法是 conic-gradient 的角度动画，
-   角度变量 --k2a 在文件顶部用 @property 注册过（没注册的话浏览器
-   不会补间，光就只会卡着不动）。
-   注意：这层故意不加 filter/drop-shadow —— filter 比 mask 先算，
-   加在这层会被 mask 裁掉，等于白加；发光感靠按钮自己的 box-shadow。 */
+
 .k2-big.on:not(.k2-danger):not(.k2-src)::before{
   content:"";position:absolute;inset:0;border-radius:inherit;padding:1.6px;
   background:conic-gradient(from var(--k2a),
@@ -230,7 +221,7 @@ function injectCSS() {
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
   -webkit-mask-composite:xor;mask-composite:exclude;
   animation:k2spin 2.8s linear infinite;pointer-events:none;}
-/* 杂项用同一套走马灯，只换色（落日橙→品红→白），跟中文模式的青区分开 */
+
 .k2-big.k2-src.on::before{
   content:"";position:absolute;inset:0;border-radius:inherit;padding:1.6px;
   background:conic-gradient(from var(--k2a),
@@ -244,7 +235,7 @@ function injectCSS() {
   -webkit-mask-composite:xor;mask-composite:exclude;
   animation:k2spin 3.2s linear infinite;pointer-events:none;}
 
-/* NSFW：红光是"闪"不是"跑" —— 呼吸式脉动，连整体亮度一起带起来 */
+
 .k2-big.on.k2-danger{border-color:rgba(255,61,113,.85);
   background:linear-gradient(180deg,rgba(255,61,113,.3),rgba(255,61,113,.06));
   animation:k2flash 1.15s ease-in-out infinite;}
@@ -255,7 +246,7 @@ function injectCSS() {
       filter:brightness(1.35) saturate(1.3);}
 }
 
-/* 大呲花：紫光走马灯（part-hz1.json，第一条汇总结） */
+
 .k2-big.on.k2-hz{border-color:rgba(139,47,247,.85);
   background:linear-gradient(180deg,rgba(139,47,247,.3),rgba(139,47,247,.06));
   box-shadow:0 0 15px rgba(139,47,247,.4),inset 0 0 0 1px rgba(139,47,247,.28);}
@@ -272,7 +263,7 @@ function injectCSS() {
   -webkit-mask-composite:xor;mask-composite:exclude;
   animation:k2spin 3s linear infinite;pointer-events:none;}
 
-/* KOOK：绿光走马灯（part-hz2.json，与大呲花的紫区分开） */
+
 .k2-big.on.k2-kook{border-color:rgba(52,211,153,.85);
   background:linear-gradient(180deg,rgba(52,211,153,.3),rgba(52,211,153,.06));
   box-shadow:0 0 15px rgba(52,211,153,.4),inset 0 0 0 1px rgba(52,211,153,.28);}
@@ -289,7 +280,7 @@ function injectCSS() {
   -webkit-mask-composite:xor;mask-composite:exclude;
   animation:k2spin 3s linear infinite;pointer-events:none;}
 
-/* ── 触发词行 ───────────────────────────────────────────────── */
+
 .k2-row{display:flex;gap:6px;align-items:stretch;}
 .k2-tgl{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;height:34px;
   padding:0 11px;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,.1);
@@ -309,7 +300,7 @@ function injectCSS() {
 .k2-in::placeholder{color:rgba(154,144,196,.55);}
 .k2-in:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(255,46,147,.16);}
 
-/* ── 高级参数（折叠） ───────────────────────────────────────── */
+
 .k2-adv{margin-top:9px;border-top:1px solid var(--ln);padding-top:8px;}
 .k2-adv>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;
   font-size:9.5px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;
@@ -328,7 +319,7 @@ function injectCSS() {
 .k2-mini:hover{color:#fff;border-color:rgba(255,138,61,.55);background:rgba(255,138,61,.1);}
 .k2-mini:active{transform:scale(.95);}
 
-/* 分段控件（mode 那种二选一） */
+
 .k2-seg{display:flex;height:34px;padding:2px;border-radius:8px;gap:2px;
   background:rgba(255,255,255,.05);}
 .k2-seg>button{flex:1;border:none;border-radius:6px;cursor:pointer;background:transparent;
@@ -337,7 +328,7 @@ function injectCSS() {
 .k2-seg>button.on{color:#fff;background:linear-gradient(135deg,var(--o),var(--p));
   box-shadow:0 2px 10px rgba(255,46,147,.4);}
 
-/* ── 底部状态条 ─────────────────────────────────────────────── */
+
 .k2-foot{margin-top:9px;padding-top:8px;border-top:1px solid var(--ln);
   display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--dim);}
 .k2-chip{padding:3px 8px;border-radius:99px;white-space:nowrap;
@@ -347,7 +338,7 @@ function injectCSS() {
 .k2-chip.k2-zero,.k2-sub.k2-zero{color:#7A7299;}
 .k2-warn{margin-top:7px;font-size:10px;line-height:1.5;color:rgba(154,144,196,.8);}
 
-/* ── 随机种子（常驻区，不再是折叠项） ───────────────────────── */
+
 .k2-seedrow{display:flex;gap:6px;align-items:stretch;}
 .k2-seedin{flex:1;min-width:0;height:34px;padding:0 10px;border-radius:8px;
   border:1px solid rgba(255,138,61,.34);background:rgba(8,6,16,.72);
@@ -357,11 +348,20 @@ function injectCSS() {
 .k2-seedin::-webkit-outer-spin-button,
 .k2-seedin::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 .k2-seedin{-moz-appearance:textfield;}
-.k2-seedtag{flex:0 0 auto;align-self:center;padding:3px 8px;border-radius:99px;
-  white-space:nowrap;font:600 10px inherit;color:var(--dim);
-  border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.035);}
+.k2-seedtag{flex:0 0 auto;align-self:center;height:24px;padding:0 10px;border-radius:99px;
+  white-space:nowrap;font:700 10px inherit;color:var(--dim);cursor:pointer;user-select:none;
+  border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.035);
+  transition:filter .16s,border-color .16s,background .16s;}
+.k2-seedtag:hover{filter:brightness(1.3);}
+.k2-seedtag:active{transform:translateY(1px);}
 .k2-seedtag.k2-fix{color:#FFD8A8;border-color:rgba(255,138,61,.45);
   background:rgba(255,138,61,.12);}
+.k2-seedtag.k2-rand{color:#7DE3C0;border-color:rgba(125,227,192,.3);
+  background:rgba(125,227,192,.08);}
+.k2-seedtag.k2-pending{color:#2A1A00;background:#FFD08A;border-color:#FFD08A;
+  animation:k2pending 1s ease-in-out infinite;}
+@keyframes k2pending{0%,100%{opacity:1}50%{opacity:.5}}
+.k2-seedin.k2-onfixed{border-color:rgba(255,138,61,.55);background:rgba(255,138,61,.08);}
 
 `;
   document.head.appendChild(s);
@@ -540,32 +540,72 @@ function buildPanel(node) {
   body.appendChild(el("div", "k2-sech", "随机种子 / SEED"));
   const seedWrap = el("div", "k2-seedrow");
   const seedInput = el("input", "k2-seedin");
-  seedInput.type = "number";
-  seedInput.min = "0";
-  seedInput.title = "0 = 每次运行都随机；填一个固定数字 = 每次都抽同一条（可复现）";
-  seedInput.oninput = () => {
-    const v = Math.max(0, parseInt(seedInput.value || "0", 10) || 0);
-    writeW(node, W_NAME.seed, v);
-    updateSeedTag(v);
+  seedInput.type = "text";
+  seedInput.inputMode = "numeric";
+  seedInput.spellcheck = false;
+  seedInput.title = "当前值：可直接手填；填完点右边按钮才会写进 seed";
+  const preview = { v: Number(readW(node, W_NAME.seed, 0)) || 0 };
+  seedInput.value = String(preview.v);
+  seedInput.addEventListener("input", () => {
+    const raw = String(seedInput.value || "").replace(/[^\d]/g, "");
+    preview.v = Math.min(4294967295, parseInt(raw || "0", 10) || 0);
+    paintSeed(true);
+  });
+  ["pointerdown", "mousedown", "wheel", "keydown", "keyup", "dblclick", "contextmenu"].forEach((t) =>
+    seedInput.addEventListener(t, (e) => { try { e.stopPropagation(); } catch (_) { } }));
+
+  const stopEvt = (e) => {
+    if (!e) return;
+    try { e.preventDefault(); } catch (_) { }
+    try { e.stopPropagation(); } catch (_) { }
+    try { e.stopImmediatePropagation && e.stopImmediatePropagation(); } catch (_) { }
   };
+
   const btnRoll = el("button", "k2-mini", "\u21BB 随机");
   btnRoll.type = "button";
-  btnRoll.title = "换一个随机种子并固定下来";
-  btnRoll.onclick = () => {
-    const v = Math.floor(Math.random() * 0xFFFFFFFF);
-    seedInput.value = String(v);
-    writeW(node, W_NAME.seed, v);
-    updateSeedTag(v);
+  btnRoll.title = "换一颗随机值填进左边（只换预览，不写进 seed）";
+  btnRoll.addEventListener("pointerdown", (e) => stopEvt(e), true);
+  btnRoll.addEventListener("mousedown", (e) => stopEvt(e), true);
+  btnRoll.addEventListener("click", (e) => {
+    stopEvt(e);
+    preview.v = Math.floor(Math.random() * 0xFFFFFFFF);
+    paintSeed(true);
+  });
+
+  const seedTag = el("button", "k2-seedtag", "随机中");
+  seedTag.type = "button";
+  seedTag.addEventListener("pointerdown", (e) => stopEvt(e), true);
+  seedTag.addEventListener("mousedown", (e) => stopEvt(e), true);
+  seedTag.addEventListener("click", (e) => {
+    stopEvt(e);
+    const w = Number(readW(node, W_NAME.seed, 0)) || 0;
+    if (w > 0) {
+      writeW(node, W_NAME.seed, 0);
+      preview.v = 0;
+    } else {
+      writeW(node, W_NAME.seed, preview.v || 0);
+    }
     sync();
-  };
-  const seedTag = el("div", "k2-seedtag", "每次随机");
+  });
   seedWrap.append(seedInput, btnRoll, seedTag);
   body.appendChild(seedWrap);
 
-  function updateSeedTag(v) {
-    const fixed = Number(v) > 0;
-    seedTag.textContent = fixed ? "固定种子" : "每次随机";
-    seedTag.classList.toggle("k2-fix", fixed);
+  function paintSeed(keepPreview) {
+    const w = Number(readW(node, W_NAME.seed, 0)) || 0;
+    if (w > 0 && !keepPreview) preview.v = w;
+    if (document.activeElement !== seedInput) seedInput.value = String(preview.v);
+    const fixed = w > 0;
+    const pending = fixed && preview.v !== w;
+    seedTag.textContent = pending ? "点我固定" : fixed ? "已固定" : "随机中";
+    seedTag.classList.toggle("k2-fix", fixed && !pending);
+    seedTag.classList.toggle("k2-pending", pending);
+    seedTag.classList.toggle("k2-rand", !fixed);
+    seedInput.classList.toggle("k2-onfixed", fixed);
+    seedTag.title = pending
+      ? `当前已固定 ${w}，左边是新值 ${preview.v}\n点一下把 ${preview.v} 设为新种子`
+      : fixed
+        ? `已锁定种子 ${w}\n点一下解锁（seed 归 0，每次运行重新随机）`
+        : `未固定（seed=0，每次运行随机）\n点一下把 ${preview.v} 锁定为固定种子`;
   }
 
   const adv = el("details", "k2-adv");
@@ -650,10 +690,7 @@ function buildPanel(node) {
     setIfIdle(trigInput, readW(node, W_NAME.trigTx, ""));
     setIfIdle(dirInput, readW(node, W_NAME.dir, ""));
     setIfIdle(sepInput, readW(node, W_NAME.sep, ""));
-    const seedVal = readW(node, W_NAME.seed, 0);
-    const sv = String(seedVal ?? 0);
-    if (document.activeElement !== seedInput && seedInput.value !== sv) seedInput.value = sv;
-    updateSeedTag(seedVal);
+    paintSeed();
 
     const mode = String(readW(node, W_NAME.mode, "single"));
     segSingle.classList.toggle("on", mode === "single");
