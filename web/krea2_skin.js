@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 
-const SKIN_VERSION = "3.7";
+const SKIN_VERSION = "3.8";
 
 
 const CONFIG = {
@@ -787,12 +787,14 @@ function applyExclusive(node, group) {
   } else if (group === "hz1") {
     writeW(node, W_NAME.cn, false);
     writeW(node, W_NAME.nsfw, false);
-    killHz();
+    writeW(node, W_NAME.hz2, false);
+    writeW(node, W_NAME.sfw, false);
     killParts();
   } else if (group === "hz2") {
     writeW(node, W_NAME.cn, false);
     writeW(node, W_NAME.nsfw, false);
-    killHz();
+    writeW(node, W_NAME.hz1, false);
+    writeW(node, W_NAME.sfw, false);
     killParts();
   } else if (group === "sfw") {
     writeW(node, W_NAME.cn, false);
