@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 
-const SKIN_VERSION = "3.8";
+const SKIN_VERSION = "3.10";
 
 
 const CONFIG = {
@@ -35,6 +35,7 @@ const W_NAME = {
   hz1:    "大呲花词库",
   hz2:    "KOOK词库",
   sfw:    "SFW词库",
+  p19:    "19+词库",
   tip:    "使用提示",
 };
 const PART_COUNT = 12;
@@ -47,6 +48,7 @@ const PART_TOTAL = PART_SIZES.reduce((a, b) => a + b, 0);
 const HZ1_SIZE = 13430;
 const HZ2_SIZE = 391;
 const SFW_SIZE = 2462;
+const P19_SIZE = 7063;
 
 const TITLE_H = 30;     
 
@@ -58,9 +60,18 @@ function readW(node, name, fallback) {
   return w ? w.value : fallback;
 }
 
+const MISS_WARNED = new Set();
+
 function writeW(node, name, value) {
   const w = findWidget(node, name);
-  if (!w) return;
+  if (!w) {
+    if (!MISS_WARNED.has(name)) {
+      MISS_WARNED.add(name);
+      console.warn("[Krea2Skin] 节点缺少控件：" + name +
+        " —— 节点定义还是旧的，请重启 ComfyUI 后再 Ctrl+F5");
+    }
+    return;
+  }
   if (Object.is(w.value, value)) return;
   w.value = value;
   try { w.callback?.(value, app.canvas, node); } catch (e) {  }
@@ -195,11 +206,11 @@ function injectCSS() {
 @keyframes k2spin{to{--k2a:360deg;}}
 
 
-.k2-duo{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+.k2-duo{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
 .k2-duo .k2-big{font-size:10.5px;}
 .k2-duo .k2-big .k2-sym{font-size:13px;}
-.k2-big.k2-th{grid-column:span 2;}      
-.k2-big.k2-half{grid-column:span 3;}    
+.k2-big.k2-th{grid-column:span 1;}
+.k2-big.k2-full{grid-column:span 3;}
 .k2-big{position:relative;height:44px;padding:0;border-radius:10px;cursor:pointer;
   border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);
   color:var(--dim);font:600 11.5px/1.3 inherit;
@@ -418,16 +429,16 @@ function buildPanel(node) {
   root.appendChild(body);
 
   const head = el("div", "k2-head");
-  const chipTotal = el("div", "k2-sub", `0 / ${PART_COUNT + 5}`);
+  const chipTotal = el("div", "k2-sub", `0 / ${PART_COUNT + 6}`);
   head.append(el("div", "k2-dot"), el("div", "k2-title", "SOURCE DECK"), chipTotal);
   body.appendChild(head);
 
-  body.appendChild(el("div", "k2-sech", "特殊模式 / MODE · 六选一"));
+  body.appendChild(el("div", "k2-sech", "特殊模式 / MODE · 七选一"));
   const duo = el("div", "k2-duo");
   const bigCN = el("button", "k2-big k2-th");
   bigCN.type = "button";
   bigCN.title = "超强中文模式：追加 part-zc.json 的中文强化词库\n" +
-                "六选一：开这个会自动关掉 NSFW、KOOK、SFW、大呲花和杂项(12 源)";
+                "七选一：开这个会自动关掉 NSFW、KOOK、SFW、19+、大呲花和杂项(12 源)";
   bigCN.append(el("span", "k2-sym", "ZH"), el("span", null, "超强中文模式"));
   bigCN.onclick = () => {
     const next = !readW(node, W_NAME.cn, false);
@@ -439,7 +450,7 @@ function buildPanel(node) {
   const bigNS = el("button", "k2-big k2-danger k2-th");
   bigNS.type = "button";
   bigNS.title = "NSFW：追加 part13.json 词库\n" +
-                "六选一：开这个会自动关掉超强中文模式、KOOK、SFW、大呲花和杂项(12 源)";
+                "七选一：开这个会自动关掉超强中文模式、KOOK、SFW、19+、大呲花和杂项(12 源)";
   bigNS.append(el("span", "k2-sym", "18+"));
   bigNS.onclick = () => {
     const next = !readW(node, W_NAME.nsfw, false);
@@ -451,7 +462,7 @@ function buildPanel(node) {
   const bigKOOK = el("button", "k2-big k2-kook k2-th");
   bigKOOK.type = "button";
   bigKOOK.title = "KOOK：加载 part-hz2.json（共 " + HZ2_SIZE + " 条）\n" +
-                  "六选一：开这个会自动关掉超强中文模式、NSFW、SFW、大呲花和杂项(12 源)";
+                  "七选一：开这个会自动关掉超强中文模式、NSFW、SFW、19+、大呲花和杂项(12 源)";
   const kookTop = el("span", "k2-toprow");
   kookTop.append(el("span", "k2-sym", "KOOK"), el("span", "k2-count", HZ2_SIZE + " 条"));
   bigKOOK.append(kookTop);
@@ -465,7 +476,7 @@ function buildPanel(node) {
   const bigSFW = el("button", "k2-big k2-sfw k2-th");
   bigSFW.type = "button";
   bigSFW.title = "SFW：加载 part-sfw.json（共 " + SFW_SIZE + " 条，桌面 SFW2300 词库）\n" +
-                 "六选一：开这个会自动关掉超强中文模式、NSFW、KOOK、大呲花和杂项(12 源)";
+                 "七选一：开这个会自动关掉超强中文模式、NSFW、KOOK、19+、大呲花和杂项(12 源)";
   const sfwTop = el("span", "k2-toprow");
   sfwTop.append(el("span", "k2-sym", "SFW"), el("span", "k2-count", SFW_SIZE + " 条"));
   bigSFW.append(sfwTop);
@@ -476,6 +487,20 @@ function buildPanel(node) {
     sync();
   };
 
+  const big19 = el("button", "k2-big k2-p19 k2-th");
+  big19.type = "button";
+  big19.title = "19+：加载 part-19.json（共 " + P19_SIZE + " 条，Bunny 三包合一）\n" +
+                "七选一：开这个会自动关掉超强中文模式、NSFW、KOOK、SFW、大呲花和杂项(12 源)";
+  const p19Top = el("span", "k2-toprow");
+  p19Top.append(el("span", "k2-sym", "19+"), el("span", "k2-count", P19_SIZE + " 条"));
+  big19.append(p19Top);
+  big19.onclick = () => {
+    const next = !readW(node, W_NAME.p19, false);
+    writeW(node, W_NAME.p19, next);
+    if (next) applyExclusive(node, "p19");
+    sync();
+  };
+
   const bigMisc = el("button", "k2-big k2-src k2-th");
   bigMisc.type = "button";
   bigMisc.title =
@@ -483,7 +508,7 @@ function buildPanel(node) {
     `开启后：single 模式从这 ${PART_COUNT} 个词库里随机抽 1 条；` +
     `concat 模式这 ${PART_COUNT} 个词库各抽 1 条再拼接。\n` +
     `点一下 = 12 个全开；再点一下 = 全关。单独挑词库请展开下面的「细分 12 源」。\n` +
-    `六选一：开这个会自动关掉超强中文模式、NSFW、KOOK、SFW 和大呲花`;
+    `七选一：开这个会自动关掉超强中文模式、NSFW、KOOK、SFW、19+ 和大呲花`;
   const mMiscBadge = el("span", "k2-badge", `0 / ${PART_COUNT}`);
   const miscTop = el("span", "k2-toprow");
   miscTop.append(el("span", "k2-sym", "MISC"), mMiscBadge);
@@ -495,10 +520,10 @@ function buildPanel(node) {
     sync();
   };
 
-  const bigHZ1 = el("button", "k2-big k2-hz k2-th");
+  const bigHZ1 = el("button", "k2-big k2-hz k2-full");
   bigHZ1.type = "button";
   bigHZ1.title = "大呲花提示词汇总（纯抽卡模式）：加载 part-hz1.json（共 " + HZ1_SIZE + " 条）\n" +
-                 "六选一：开这个会自动关掉超强中文模式、NSFW、KOOK、SFW 和杂项(12 源)";
+                 "七选一：开这个会自动关掉超强中文模式、NSFW、KOOK、SFW、19+ 和杂项(12 源)";
   const dzTop = el("span", "k2-toprow");
   dzTop.append(el("span", "k2-sym", "大呲花"), el("span", "k2-count", HZ1_SIZE + " 条"));
   bigHZ1.append(dzTop);
@@ -509,7 +534,7 @@ function buildPanel(node) {
     sync();
   };
 
-  duo.append(bigCN, bigNS, bigKOOK, bigSFW, bigMisc, bigHZ1);
+  duo.append(bigCN, bigNS, bigKOOK, bigSFW, big19, bigMisc, bigHZ1);
   body.appendChild(duo);
 
   const more = el("details", "k2-more");
@@ -706,6 +731,7 @@ function buildPanel(node) {
     bigNS.classList.toggle("on", !!readW(node, W_NAME.nsfw, false));
     bigKOOK.classList.toggle("on", !!readW(node, W_NAME.hz2, false));
     bigSFW.classList.toggle("on", !!readW(node, W_NAME.sfw, false));
+    big19.classList.toggle("on", !!readW(node, W_NAME.p19, false));
     bigHZ1.classList.toggle("on", !!readW(node, W_NAME.hz1, false));
     tgl.classList.toggle("on", !!readW(node, W_NAME.trigOn, false));
 
@@ -725,7 +751,7 @@ function buildPanel(node) {
 
     const n = countActive(node);
     const onlyMisc = ms === "all" && n === PART_COUNT;
-    chipTotal.textContent = `${n} / ${PART_COUNT + 5}`;
+    chipTotal.textContent = `${n} / ${PART_COUNT + 6}`;
     chipTotal.classList.toggle("k2-hot", n > 0);
     chipTotal.classList.toggle("k2-zero", n === 0);
 
@@ -763,6 +789,7 @@ function countActive(node) {
   if (readW(node, W_NAME.hz1, false)) n++;
   if (readW(node, W_NAME.hz2, false)) n++;
   if (readW(node, W_NAME.sfw, false)) n++;
+  if (readW(node, W_NAME.p19, false)) n++;
   for (let i = 1; i <= PART_COUNT; i++) if (readW(node, partName(i), false)) n++;
   return n;
 }
@@ -775,6 +802,7 @@ function applyExclusive(node, group) {
     writeW(node, W_NAME.hz1, false);
     writeW(node, W_NAME.hz2, false);
     writeW(node, W_NAME.sfw, false);
+    writeW(node, W_NAME.p19, false);
   };
   if (group === "cn") {
     writeW(node, W_NAME.nsfw, false);
@@ -789,18 +817,28 @@ function applyExclusive(node, group) {
     writeW(node, W_NAME.nsfw, false);
     writeW(node, W_NAME.hz2, false);
     writeW(node, W_NAME.sfw, false);
+    writeW(node, W_NAME.p19, false);
     killParts();
   } else if (group === "hz2") {
     writeW(node, W_NAME.cn, false);
     writeW(node, W_NAME.nsfw, false);
     writeW(node, W_NAME.hz1, false);
     writeW(node, W_NAME.sfw, false);
+    writeW(node, W_NAME.p19, false);
     killParts();
   } else if (group === "sfw") {
     writeW(node, W_NAME.cn, false);
     writeW(node, W_NAME.nsfw, false);
     writeW(node, W_NAME.hz1, false);
     writeW(node, W_NAME.hz2, false);
+    writeW(node, W_NAME.p19, false);
+    killParts();
+  } else if (group === "p19") {
+    writeW(node, W_NAME.cn, false);
+    writeW(node, W_NAME.nsfw, false);
+    writeW(node, W_NAME.hz1, false);
+    writeW(node, W_NAME.hz2, false);
+    writeW(node, W_NAME.sfw, false);
     killParts();
   } else if (group === "misc") {
     writeW(node, W_NAME.cn, false);
