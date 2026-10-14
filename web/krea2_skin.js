@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 
-const SKIN_VERSION = "3.11";
+const SKIN_VERSION = "3.12";
 
 
 const CONFIG = {
@@ -589,7 +589,9 @@ function buildPanel(node) {
   seedInput.value = String(Number(readW(node, W_NAME.seed, 0)) || 0);
   seedInput.addEventListener("input", () => {
     const raw = String(seedInput.value || "").replace(/[^\d]/g, "");
-    writeW(node, W_NAME.seed, Math.min(4294967295, parseInt(raw || "0", 10) || 0));
+    const v = Math.min(4294967295, parseInt(raw || "0", 10) || 0);
+    setSeedMode(v > 0);
+    writeW(node, W_NAME.seed, v);
     paintSeed();
   });
   ["pointerdown", "mousedown", "wheel", "keydown", "keyup", "dblclick", "contextmenu"].forEach((t) =>
@@ -613,11 +615,54 @@ function buildPanel(node) {
     try { node.graph?.setDirtyCanvas?.(true, false); } catch (_) { }
   };
 
-  const isFixed = () => (Number(readW(node, W_NAME.seed, 0)) || 0) > 0;
+  const SEED_FIXED_PROP = "__k2SeedFixed";
+
+  let seedModeManual = false;
+
+  const autoSeedMode = () => {
+    if (seedModeManual) return;
+    const idx = (node.widgets || []).findIndex((w) => w.name === W_NAME.seed);
+    const fromWorkflow = Array.isArray(node.widgets_values) && node.widgets_values.length > 0;
+    let base = 0;
+    if (fromWorkflow && idx >= 0) base = Number(node.widgets_values[idx]) || 0;
+    else if (fromWorkflow) base = Number(readW(node, W_NAME.seed, 0)) || 0;
+    if (!node.properties) node.properties = {};
+    node.properties[SEED_FIXED_PROP] = base > 0;
+  };
+  autoSeedMode();
+  chain(node, "onConfigure", function () { autoSeedMode(); });
+
+  const seedMode = () =>
+    (node.properties && node.properties[SEED_FIXED_PROP] === true) ? "fixed" : "rand";
+
+  const setSeedMode = (fixed) => {
+    seedModeManual = true;
+    if (!node.properties) node.properties = {};
+    node.properties[SEED_FIXED_PROP] = !!fixed;
+  };
+
+  const isFixed = () => seedMode() === "fixed";
+
+  const rollSeed = () => {
+    writeW(node, W_NAME.seed, Math.floor(Math.random() * 0xFFFFFFFF));
+    paintSeed();
+  };
+
+  const installSeedHook = () => {
+    const sw = findWidget(node, W_NAME.seed);
+    if (!sw || sw.__k2SeedHook) return;
+    sw.__k2SeedHook = true;
+    const prev = sw.beforeQueued;
+    sw.beforeQueued = function (...a) {
+      if (seedMode() !== "fixed") rollSeed();
+      try { if (prev) prev.apply(this, a); } catch (_) { }
+    };
+  };
 
   const setFixed = (on) => {
+    setSeedMode(on);
     const cur = Number(readW(node, W_NAME.seed, 0)) || 0;
-    writeW(node, W_NAME.seed, on ? (cur || Math.floor(Math.random() * 0xFFFFFFFF)) : 0);
+    if (on && !cur) writeW(node, W_NAME.seed, Math.floor(Math.random() * 0xFFFFFFFF));
     lockCtrl();
     paintSeed();
     sync();
@@ -630,8 +675,8 @@ function buildPanel(node) {
   btnRoll.addEventListener("mousedown", (e) => stopEvt(e), true);
   btnRoll.addEventListener("click", (e) => {
     stopEvt(e);
-    writeW(node, W_NAME.seed, Math.floor(Math.random() * 0xFFFFFFFF));
-    paintSeed();
+    rollSeed();
+    sync();
   });
 
   const seedTag = el("button", "k2-seedtag", "随机中");
@@ -656,8 +701,8 @@ function buildPanel(node) {
     seedTag.classList.toggle("k2-rand", !fixed);
     seedInput.classList.toggle("k2-onfixed", fixed);
     seedTag.title = fixed
-      ? `已锁定：每次运行都用种子 ${w}\n点一下切回随机（每次运行自动换）`
-      : `随机中：每次运行自动换种子\n点一下锁定当前值 ${w}`;
+      ? `已锁定：每次运行都用种子 ${w}\n点一下切回随机（每次运行自动换一颗）`
+      : `随机中：每次运行自动换一颗并显示出来\n点一下锁定当前值 ${w}`;
   }
 
   const adv = el("details", "k2-adv");
@@ -745,6 +790,8 @@ function buildPanel(node) {
     setIfIdle(dirInput, readW(node, W_NAME.dir, ""));
     setIfIdle(sepInput, readW(node, W_NAME.sep, ""));
     lockCtrl();
+    installSeedHook();
+    if (!isFixed() && (Number(readW(node, W_NAME.seed, 0)) || 0) === 0) rollSeed();
     paintSeed();
 
     const mode = String(readW(node, W_NAME.mode, "single"));
