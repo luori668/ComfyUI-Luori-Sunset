@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 
-const SKIN_VERSION = "3.10";
+const SKIN_VERSION = "3.11";
 
 
 const CONFIG = {
@@ -585,7 +585,7 @@ function buildPanel(node) {
   seedInput.type = "text";
   seedInput.inputMode = "numeric";
   seedInput.spellcheck = false;
-  seedInput.title = "种子值：可直接手填；随机模式下每次运行会自动换";
+  seedInput.title = "种子值：手填数字即固定该种子；留 0 = 每次运行随机";
   seedInput.value = String(Number(readW(node, W_NAME.seed, 0)) || 0);
   seedInput.addEventListener("input", () => {
     const raw = String(seedInput.value || "").replace(/[^\d]/g, "");
@@ -603,23 +603,24 @@ function buildPanel(node) {
   };
 
   const ctrlOf = () => (node.widgets || []).find((w) => w.name === "control_after_generate") || null;
-  const isFixed = () => {
+
+  const lockCtrl = () => {
     const c = ctrlOf();
-    if (c) return c.value === "fixed";
-    return (Number(readW(node, W_NAME.seed, 0)) || 0) > 0;
+    if (!c) return;
+    if (c.value === "fixed") return;
+    c.value = "fixed";
+    try { c.callback?.("fixed", app.canvas, node); } catch (_) { }
+    try { node.graph?.setDirtyCanvas?.(true, false); } catch (_) { }
   };
+
+  const isFixed = () => (Number(readW(node, W_NAME.seed, 0)) || 0) > 0;
+
   const setFixed = (on) => {
-    const c = ctrlOf();
-    if (c) {
-      const v = on ? "fixed" : "randomize";
-      if (c.value !== v) {
-        c.value = v;
-        try { c.callback?.(v, app.canvas, node); } catch (_) { }
-      }
-      return;
-    }
     const cur = Number(readW(node, W_NAME.seed, 0)) || 0;
     writeW(node, W_NAME.seed, on ? (cur || Math.floor(Math.random() * 0xFFFFFFFF)) : 0);
+    lockCtrl();
+    paintSeed();
+    sync();
   };
 
   const btnRoll = el("button", "k2-mini", "\u21BB 随机");
@@ -743,6 +744,7 @@ function buildPanel(node) {
     setIfIdle(trigInput, readW(node, W_NAME.trigTx, ""));
     setIfIdle(dirInput, readW(node, W_NAME.dir, ""));
     setIfIdle(sepInput, readW(node, W_NAME.sep, ""));
+    lockCtrl();
     paintSeed();
 
     const mode = String(readW(node, W_NAME.mode, "single"));
