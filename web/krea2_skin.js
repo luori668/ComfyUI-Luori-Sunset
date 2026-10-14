@@ -1,6 +1,6 @@
 import { app } from "../../scripts/app.js";
 
-const SKIN_VERSION = "3.12";
+const SKIN_VERSION = "3.15";
 
 
 const CONFIG = {
@@ -22,6 +22,144 @@ const THEME = {
   bgMid:  "#1D1438",
 };
 
+const THEMES = [
+  { name: "霓虹", orange: "#FF8A3D", pink: "#FF2E93", purple: "#8B2FF7", cyan: "#22D3EE",
+    bg1: "#191134", bg2: "#100B1F",
+    g1: "rgba(255,46,147,.18)", g2: "rgba(139,47,247,.22)" },
+  { name: "赛博蓝", orange: "#38BDF8", pink: "#22D3EE", purple: "#2563EB", cyan: "#67E8F9",
+    bg1: "#0B1A2E", bg2: "#05101F",
+    g1: "rgba(56,189,248,.20)", g2: "rgba(37,99,235,.26)" },
+  { name: "暗金", orange: "#F5B942", pink: "#E0862B", purple: "#8A5A1C", cyan: "#FFD98A",
+    bg1: "#1E160C", bg2: "#120C06",
+    g1: "rgba(245,185,66,.18)", g2: "rgba(138,90,28,.26)" },
+  { name: "极光", orange: "#4ADE80", pink: "#22D3EE", purple: "#A78BFA", cyan: "#86EFAC",
+    bg1: "#0C1F1A", bg2: "#05110F",
+    g1: "rgba(74,222,128,.16)", g2: "rgba(167,139,250,.22)" },
+  { name: "樱粉", orange: "#FF9AC1", pink: "#FF5FA2", purple: "#C026D3", cyan: "#FFD1E8",
+    bg1: "#241126", bg2: "#150A18",
+    g1: "rgba(255,95,162,.20)", g2: "rgba(192,38,211,.24)" },
+  { name: "深海", orange: "#5EEAD4", pink: "#38BDF8", purple: "#4338CA", cyan: "#A5F3FC",
+    bg1: "#0A1430", bg2: "#04091C",
+    g1: "rgba(56,189,248,.18)", g2: "rgba(67,56,202,.28)" },
+  { name: "熔岩", orange: "#FF6B2C", pink: "#FF2D55", purple: "#7C1D12", cyan: "#FFC48A",
+    bg1: "#24100A", bg2: "#140704",
+    g1: "rgba(255,109,44,.20)", g2: "rgba(124,29,18,.30)" },
+  { name: "幻紫", orange: "#C084FC", pink: "#A855F7", purple: "#6D28D9", cyan: "#E9D5FF",
+    bg1: "#1A1030", bg2: "#0C0718",
+    g1: "rgba(168,85,247,.20)", g2: "rgba(109,40,217,.28)" },
+];
+
+let themeIdx = 0;
+let sfxOn = true;
+let actx = null;
+
+function storeGet(k, d) {
+  try {
+    const v = localStorage.getItem(k);
+    return v == null ? d : v;
+  } catch (e) { return d; }
+}
+
+function storeSet(k, v) {
+  try { localStorage.setItem(k, String(v)); } catch (e) { }
+}
+
+function loadPrefs() {
+  const t = parseInt(storeGet("k2_theme", "0"), 10);
+  themeIdx = (Number.isFinite(t) && t >= 0 && t < THEMES.length) ? t : 0;
+  sfxOn = storeGet("k2_sfx", "1") !== "0";
+}
+loadPrefs();
+
+function applyTheme(root) {
+  const t = THEMES[themeIdx];
+  THEME.orange = t.orange;
+  THEME.pink = t.pink;
+  THEME.purple = t.purple;
+  THEME.cyan = t.cyan;
+  THEME.bgDeep = t.bg2;
+  THEME.bgMid = t.bg1;
+  if (root && root.style && root.style.setProperty) {
+    root.style.setProperty("--o", t.orange);
+    root.style.setProperty("--p", t.pink);
+    root.style.setProperty("--v", t.purple);
+    root.style.setProperty("--cy", t.cyan);
+    root.style.setProperty("--bg1", t.bg1);
+    root.style.setProperty("--bg2", t.bg2);
+    root.style.setProperty("--g1", t.g1);
+    root.style.setProperty("--g2", t.g2);
+  }
+}
+
+function acGet() {
+  if (actx) {
+    if (actx.state === "suspended" && actx.resume) { try { actx.resume(); } catch (e) { } }
+    return actx;
+  }
+  try {
+    const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
+    if (!AC) return null;
+    actx = new AC();
+  } catch (e) { return null; }
+  return actx;
+}
+
+function tone(c, freq, t0, dur, type, vol) {
+  const o = c.createOscillator();
+  const g = c.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t0);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g);
+  g.connect(c.destination);
+  o.start(t0);
+  o.stop(t0 + dur + 0.03);
+}
+
+function sfx(kind) {
+  if (!sfxOn) return;
+  const c = acGet();
+  if (!c) return;
+  try {
+    const t = c.currentTime + 0.005;
+    if (kind === "tick") tone(c, 1180, t, 0.05, "square", 0.035);
+    else if (kind === "flip") {
+      tone(c, 660, t, 0.1, "triangle", 0.07);
+      tone(c, 990, t + 0.07, 0.14, "triangle", 0.055);
+    } else if (kind === "ssr") {
+      const notes = [523, 659, 784, 1047, 1319];
+      for (let i = 0; i < notes.length; i++) tone(c, notes[i], t + i * 0.075, 0.36, "sine", 0.07);
+    } else if (kind === "on") tone(c, 520, t, 0.09, "sine", 0.05);
+    else if (kind === "off") tone(c, 320, t, 0.09, "sine", 0.05);
+  } catch (e) { }
+}
+
+function rollTo(host, text) {
+  const s = String(text == null ? "" : text);
+  if (!host) return;
+  const prev = host.__k2roll;
+  if (prev === s) return;
+  host.__k2roll = s;
+  if (prev === undefined || prev === "") { host.textContent = s; return; }
+  const box = document.createElement("span");
+  box.className = "k2-roll";
+  const out = document.createElement("span");
+  out.className = "k2-rout";
+  out.textContent = prev;
+  const inn = document.createElement("span");
+  inn.className = "k2-rin";
+  inn.textContent = s;
+  box.appendChild(out);
+  box.appendChild(inn);
+  host.textContent = "";
+  host.appendChild(box);
+  setTimeout(() => {
+    if (host.__k2roll === s) host.textContent = s;
+  }, 360);
+}
+
 const NODE_CLASS = "Krea2PromptPicker";
 const W_NAME = {
   dir:    "prompt_dir",
@@ -40,6 +178,26 @@ const W_NAME = {
 };
 const PART_COUNT = 12;
 const partName = (i) => `提示词${i}`;
+
+const DRAW_MAP = new Map();
+let drawBound = false;
+
+function bindDrawFeed() {
+  if (drawBound) return;
+  drawBound = true;
+  try {
+    app.api.addEventListener("executed", (ev) => {
+      const d = (ev && ev.detail) || ev;
+      if (!d) return;
+      const fn = d.node != null ? DRAW_MAP.get(d.node) : null;
+      if (!fn) return;
+      const t = d.text;
+      const arr = Array.isArray(t) ? t : (t != null ? [t] : []);
+      if (!arr.length) return;
+      try { fn(arr[arr.length - 1]); } catch (e) { }
+    });
+  } catch (e) { }
+}
 
 const PART_SIZES = [500, 500, 500, 500, 500, 500, 500, 500, 491, 247, 247, 1662];
 const PART_TOTAL = PART_SIZES.reduce((a, b) => a + b, 0);
@@ -111,18 +269,34 @@ function injectCSS() {
   --o:${THEME.orange}; --p:${THEME.pink}; --v:${THEME.purple};
   --cy:${THEME.cyan};  --dg:${THEME.danger};
   --ln:rgba(255,255,255,.09); --tx:#EDE9FE; --dim:#9A90C4;
+  --bg1:#191134; --bg2:#100B1F;
+  --g1:rgba(255,46,147,.18); --g2:rgba(139,47,247,.22);
   box-sizing:border-box; width:100%; padding:10px;
-  
-  height:auto !important; min-height:0; overflow:visible;
+  position:relative;
+  height:auto !important; min-height:0; overflow:hidden;
   font:12px/1.45 "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
   color:var(--tx); border-radius:12px;
   background:
-    radial-gradient(130% 90% at 100% 0%,  rgba(255,46,147,.18), transparent 58%),
-    radial-gradient(120% 85% at 0% 100%,  rgba(139,47,247,.22), transparent 58%),
-    linear-gradient(180deg,#191134,#100B1F);
+    radial-gradient(130% 90% at 100% 0%,  var(--g1), transparent 58%),
+    radial-gradient(120% 85% at 0% 100%,  var(--g2), transparent 58%),
+    linear-gradient(180deg,var(--bg1),var(--bg2));
   border:1px solid rgba(255,255,255,.075);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 10px 30px rgba(0,0,0,.55);
 }
+.k2-root::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:3;
+  background:linear-gradient(105deg,transparent 30%,
+    rgba(255,61,113,.16) 38%,
+    rgba(255,138,61,.16) 43%,
+    rgba(255,224,102,.18) 48%,
+    rgba(74,222,128,.16) 53%,
+    rgba(34,211,238,.18) 58%,
+    rgba(139,47,247,.16) 63%,
+    transparent 72%);
+  transform:translateX(-130%);
+  animation:k2sweep 7s linear infinite,k2hue 6s linear infinite;}
+@keyframes k2sweep{0%{transform:translateX(-130%)}52%{transform:translateX(130%)}100%{transform:translateX(130%)}}
+@keyframes k2hue{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.k2-root::after{animation:none;opacity:0;}}
 .k2-root *{box-sizing:border-box;}
 
 
@@ -134,7 +308,7 @@ function injectCSS() {
   background:var(--o);box-shadow:0 0 9px var(--o);animation:k2pulse 2.6s ease-in-out infinite;}
 @keyframes k2pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.82)}}
 .k2-title{font-weight:800;font-size:12.5px;letter-spacing:.05em;
-  background:linear-gradient(92deg,#FFC178,#FF2E93 52%,#8B2FF7);
+  background:linear-gradient(92deg,var(--o),var(--p) 52%,var(--v));
   -webkit-background-clip:text;background-clip:text;color:transparent;white-space:nowrap;}
 .k2-sub{margin-left:auto;flex:0 0 auto;padding:3px 9px;border-radius:99px;
   font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--dim);white-space:nowrap;
@@ -295,6 +469,60 @@ function injectCSS() {
   animation:k2spin 3s linear infinite;pointer-events:none;}
 
 
+.k2-big.on.k2-sfw{border-color:rgba(56,189,248,.85);
+  background:linear-gradient(180deg,rgba(56,189,248,.3),rgba(56,189,248,.06));
+  box-shadow:0 0 15px rgba(56,189,248,.4),inset 0 0 0 1px rgba(56,189,248,.28);}
+.k2-big.on.k2-sfw:not(.k2-danger):not(.k2-src)::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;padding:1.6px;
+  background:conic-gradient(from var(--k2a),
+    rgba(56,189,248,0)   0deg 270deg,
+    rgba(56,189,248,.45) 292deg,
+    #BAE6FD              318deg,
+    #FFFFFF              334deg,
+    rgba(56,189,248,.45) 350deg,
+    rgba(56,189,248,0)   360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  animation:k2spin 2.6s linear infinite;pointer-events:none;}
+
+
+.k2-big.on.k2-p19{border-color:rgba(255,176,32,.85);
+  background:linear-gradient(180deg,rgba(255,176,32,.3),rgba(255,176,32,.06));
+  box-shadow:0 0 15px rgba(255,176,32,.4),inset 0 0 0 1px rgba(255,176,32,.28);}
+.k2-big.on.k2-p19:not(.k2-danger):not(.k2-src)::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;padding:1.6px;
+  background:conic-gradient(from var(--k2a),
+    rgba(255,176,32,0)   0deg 270deg,
+    rgba(255,176,32,.5)  292deg,
+    #FFE9A8              318deg,
+    #FFFFFF              334deg,
+    rgba(255,176,32,.5)  350deg,
+    rgba(255,176,32,0)   360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  animation:k2spin 3.6s linear infinite;pointer-events:none;}
+
+
+.k2-big.on.k2-cn{border-color:transparent;
+  background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.03));
+  box-shadow:0 0 16px rgba(255,255,255,.16),inset 0 0 0 1px rgba(255,255,255,.2);}
+.k2-big.on.k2-cn:not(.k2-danger):not(.k2-src)::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;padding:1.8px;
+  background:conic-gradient(from var(--k2a),
+    #FF3D71 0deg, #FF8A3D 52deg, #FFE066 104deg, #4ADE80 156deg,
+    #22D3EE 208deg, #6366F1 260deg, #A855F7 312deg, #FF3D71 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  animation:k2spin 2.2s linear infinite,k2rain 4s linear infinite;pointer-events:none;}
+@keyframes k2rain{0%{filter:saturate(1.15) brightness(1)}50%{filter:saturate(1.6) brightness(1.22)}100%{filter:saturate(1.15) brightness(1)}}
+.k2-big.on.k2-cn .k2-sym{
+  background:linear-gradient(92deg,#FF3D71,#FF8A3D,#FFE066,#4ADE80,#22D3EE,#A855F7,#FF3D71);
+  background-size:280% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:k2slide 3.2s linear infinite;}
+@keyframes k2slide{0%{background-position:0% 50%}100%{background-position:280% 50%}}
+
+
 .k2-row{display:flex;gap:6px;align-items:stretch;}
 .k2-tgl{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;height:34px;
   padding:0 11px;border-radius:8px;cursor:pointer;border:1px solid rgba(255,255,255,.1);
@@ -377,6 +605,76 @@ function injectCSS() {
 @keyframes k2pending{0%,100%{opacity:1}50%{opacity:.5}}
 .k2-seedin.k2-onfixed{border-color:rgba(255,138,61,.55);background:rgba(255,138,61,.08);}
 
+.k2-draw{margin-top:9px;padding-top:9px;border-top:1px solid var(--ln);}
+.k2-dhead{display:flex;align-items:center;gap:6px;margin-bottom:7px;}
+.k2-dhead .k2-sech{flex:1;margin:0;min-width:0;}
+.k2-rare{flex:0 0 auto;padding:2px 9px;border-radius:99px;white-space:nowrap;
+  font:800 10px/1.5 inherit;letter-spacing:.1em;border:1px solid;}
+.k2-rare.r-R,.k2-hr.r-R{color:#7DE3C0;border-color:rgba(125,227,192,.45);background:rgba(125,227,192,.1);}
+.k2-rare.r-SR,.k2-hr.r-SR{color:#C4A6FF;border-color:rgba(178,140,255,.5);background:rgba(139,47,247,.16);}
+.k2-hr.r-R,.k2-hr.r-SR,.k2-hr.r-SSR{border:1px solid;padding:1px 6px;}
+.k2-rare.r-SSR,.k2-hr.r-SSR{color:#FFE2A8;border-color:rgba(255,209,102,.6);background:rgba(255,168,0,.16);}
+.k2-rare.r-SSR{animation:k2ssr 1.8s ease-in-out infinite;}
+@keyframes k2ssr{0%,100%{box-shadow:0 0 8px rgba(255,197,66,.22)}50%{box-shadow:0 0 18px rgba(255,197,66,.62)}}
+.k2-card{position:relative;border-radius:11px;padding:9px 10px;min-height:70px;
+  border:1px solid rgba(255,255,255,.1);
+  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015));
+  transform-style:preserve-3d;backface-visibility:hidden;}
+.k2-card.k2-flip{animation:k2flip .6s cubic-bezier(.22,1,.36,1);}
+@keyframes k2flip{from{transform:perspective(720px) rotateY(-92deg) scale(.94);opacity:0}
+  to{transform:perspective(720px) rotateY(0) scale(1);opacity:1}}
+.k2-card.r-SR{border-color:rgba(178,140,255,.4);}
+.k2-card.r-SSR{border-color:rgba(255,209,102,.5);
+  background:linear-gradient(180deg,rgba(255,190,80,.13),rgba(255,255,255,.02));}
+.k2-dtxt{margin:0;max-height:88px;overflow:auto;white-space:pre-wrap;word-break:break-word;
+  font:11.5px/1.55 "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:var(--tx);}
+.k2-dtxt::-webkit-scrollbar{width:6px;}
+.k2-dtxt::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:99px;}
+.k2-dmeta{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;}
+.k2-dmeta>span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  padding:2px 8px;border-radius:99px;font:600 9.5px/1.5 inherit;color:var(--dim);
+  border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.035);}
+.k2-dbar{display:flex;align-items:center;gap:6px;margin-top:7px;}
+.k2-dsp{flex:1;min-width:0;}
+.k2-dbtn{flex:0 0 auto;height:24px;padding:0 10px;border-radius:99px;cursor:pointer;white-space:nowrap;
+  font:700 10px/1 inherit;color:var(--dim);border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.04);transition:color .16s,border-color .16s,background .16s;}
+.k2-dbtn:hover{color:var(--tx);border-color:rgba(255,255,255,.26);}
+.k2-dbtn.k2-on{color:#FFD8A8;border-color:rgba(255,138,61,.45);background:rgba(255,138,61,.12);}
+.k2-hist{margin-top:7px;display:none;}
+.k2-hist.k2-open{display:block;}
+.k2-hlist{display:flex;flex-direction:column;gap:5px;max-height:128px;overflow:auto;}
+.k2-hlist::-webkit-scrollbar{width:6px;}
+.k2-hlist::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:99px;}
+.k2-hitem{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:8px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);
+  transition:border-color .16s,background .16s;}
+.k2-hitem:hover{border-color:rgba(255,138,61,.4);background:rgba(255,138,61,.08);}
+.k2-hitem .k2-hr{flex:0 0 auto;padding:1px 6px;border-radius:99px;font:800 8.5px/1.5 inherit;}
+.k2-hitem .k2-hs{flex:0 0 auto;font:600 9px/1.5 inherit;color:var(--dim);white-space:nowrap;}
+.k2-hitem .k2-ht{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font:10.5px/1.5 inherit;color:var(--tx);}
+.k2-dempty{padding:4px 2px;font-size:10.5px;color:#7A7299;}
+
+.k2-dbar{flex-wrap:wrap;}
+.k2-big::after,.k2-tile::after{content:"";position:absolute;inset:0;border-radius:inherit;
+  pointer-events:none;opacity:0;transition:opacity .2s;
+  background:radial-gradient(84px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.2),transparent 62%);}
+.k2-big:hover::after,.k2-tile:hover::after{opacity:1;}
+.k2-tile::after{background:radial-gradient(64px circle at var(--mx,50%) var(--my,50%),
+  rgba(255,255,255,.18),transparent 62%);}
+
+.k2-roll{position:relative;display:inline-block;overflow:hidden;vertical-align:bottom;white-space:nowrap;}
+.k2-roll>span{display:block;}
+.k2-roll>.k2-rin{animation:k2rin .34s cubic-bezier(.22,1,.36,1);}
+.k2-roll>.k2-rout{position:absolute;left:0;top:0;animation:k2rout .34s cubic-bezier(.22,1,.36,1);}
+@keyframes k2rin{from{transform:translateY(105%);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes k2rout{from{transform:translateY(0);opacity:1}to{transform:translateY(-105%);opacity:0}}
+@media (prefers-reduced-motion:reduce){
+  .k2-roll>.k2-rin,.k2-roll>.k2-rout{animation:none;}
+  .k2-roll>.k2-rout{display:none;}
+}
+
 `;
   document.head.appendChild(s);
 }
@@ -435,7 +733,7 @@ function buildPanel(node) {
 
   body.appendChild(el("div", "k2-sech", "特殊模式 / MODE · 七选一"));
   const duo = el("div", "k2-duo");
-  const bigCN = el("button", "k2-big k2-th");
+  const bigCN = el("button", "k2-big k2-cn k2-th");
   bigCN.type = "button";
   bigCN.title = "超强中文模式：追加 part-zc.json 的中文强化词库\n" +
                 "七选一：开这个会自动关掉 NSFW、KOOK、SFW、19+、大呲花和杂项(12 源)";
@@ -761,6 +1059,201 @@ function buildPanel(node) {
 
   body.appendChild(foot);
 
+  const drawWrap = el("div", "k2-draw");
+  const drawHead = el("div", "k2-dhead");
+  drawHead.appendChild(el("div", "k2-sech", "抽卡结果 / DRAW"));
+  const rareTag = el("div", "k2-rare r-R", "R");
+  rareTag.style.display = "none";
+  drawHead.appendChild(rareTag);
+  drawWrap.appendChild(drawHead);
+
+  const cardBox = el("div", "k2-card");
+  const cardTxt = el("div", "k2-dtxt", "运行一次后，这里会翻出抽到的卡。");
+  cardBox.appendChild(cardTxt);
+  drawWrap.appendChild(cardBox);
+
+  const metaRow = el("div", "k2-dmeta");
+  drawWrap.appendChild(metaRow);
+
+  const btnBar = el("div", "k2-dbar");
+  const btnCopy = el("button", "k2-dbtn", "复制");
+  btnCopy.type = "button";
+  const btnSkip = el("button", "k2-dbtn", "跳字");
+  btnSkip.type = "button";
+  const btnHist = el("button", "k2-dbtn", "历史 0");
+  btnHist.type = "button";
+  const btnSfx = el("button", "k2-dbtn", "音效");
+  btnSfx.type = "button";
+  btnSfx.title = "抽卡音效（默认开）\n开：翻牌声、SSR 专属音、按钮点击声\n关：批量排队时更安静";
+  const btnTheme = el("button", "k2-dbtn", "配色");
+  btnTheme.type = "button";
+  btnTheme.title = "切换面板配色（8 套）：霓虹 / 赛博蓝 / 暗金 / 极光 / 樱粉 / 深海 / 熔岩 / 幻紫";
+  btnBar.append(btnCopy, btnSkip, btnSfx, btnTheme, el("div", "k2-dsp"), btnHist);
+
+  btnSfx.classList.toggle("k2-on", sfxOn);
+  applyTheme(root);
+
+  btnSfx.addEventListener("click", () => {
+    sfxOn = !sfxOn;
+    storeSet("k2_sfx", sfxOn ? "1" : "0");
+    btnSfx.classList.toggle("k2-on", sfxOn);
+    sfx(sfxOn ? "on" : "off");
+  });
+
+  btnTheme.addEventListener("click", () => {
+    themeIdx = (themeIdx + 1) % THEMES.length;
+    storeSet("k2_theme", String(themeIdx));
+    applyTheme(root);
+    btnTheme.textContent = THEMES[themeIdx].name;
+    setTimeout(() => { btnTheme.textContent = "配色"; }, 1100);
+  });
+  drawWrap.appendChild(btnBar);
+
+  const histBox = el("div", "k2-hist");
+  const histList = el("div", "k2-hlist");
+  histBox.appendChild(histList);
+  drawWrap.appendChild(histBox);
+  body.appendChild(drawWrap);
+
+  const SRC_KEY = {
+    "超强中文": W_NAME.cn,
+    "18+": W_NAME.nsfw,
+    "大呲花": W_NAME.hz1,
+    "KOOK": W_NAME.hz2,
+    "SFW": W_NAME.sfw,
+    "19+": W_NAME.p19,
+  };
+
+  let drawLast = "";
+  let typeTimer = null;
+
+  const stopType = () => {
+    if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
+  };
+
+  const typeOut = (text) => {
+    stopType();
+    if (!text) { cardTxt.textContent = ""; return; }
+    if (text.length > 300) { cardTxt.textContent = text; return; }
+    let i = 0;
+    cardTxt.textContent = "";
+    const step = Math.max(1, Math.ceil(text.length / 55));
+    typeTimer = setInterval(() => {
+      i += step;
+      if (i >= text.length) { cardTxt.textContent = text; stopType(); return; }
+      cardTxt.textContent = text.slice(0, i);
+    }, 16);
+  };
+
+  const histArr = () => {
+    if (!node.properties) node.properties = {};
+    if (!Array.isArray(node.properties.__k2Hist)) node.properties.__k2Hist = [];
+    return node.properties.__k2Hist;
+  };
+
+  const clearKids = (box) => {
+    while (box.firstChild) box.removeChild(box.firstChild);
+  };
+
+  const renderHist = () => {
+    const arr = histArr();
+    btnHist.textContent = `历史 ${arr.length}`;
+    clearKids(histList);
+    if (!arr.length) {
+      histList.appendChild(el("div", "k2-dempty", "还没有记录，运行一次就有了"));
+      return;
+    }
+    for (const it of arr.slice().reverse()) {
+      const row = el("div", "k2-hitem");
+      row.title = `${it.src} · 种子 ${it.seed}\n${it.text}\n点一下回填这个种子`;
+      row.appendChild(el("span", "k2-hr r-" + it.r, it.r));
+      row.appendChild(el("span", "k2-hs", it.src));
+      row.appendChild(el("span", "k2-ht", it.text));
+      row.addEventListener("click", () => {
+        writeW(node, W_NAME.seed, Number(it.seed) || 0);
+        if (!node.properties) node.properties = {};
+        node.properties.__k2SeedFixed = (Number(it.seed) || 0) > 0;
+        const key = SRC_KEY[it.src];
+        if (key) {
+          for (const k of Object.values(SRC_KEY)) {
+            if (k !== key) writeW(node, k, false);
+          }
+          writeW(node, key, true);
+        }
+        sync();
+      });
+      histList.appendChild(row);
+    }
+  };
+
+  btnSkip.addEventListener("click", () => {
+    if (drawLast) { stopType(); cardTxt.textContent = drawLast; }
+  });
+
+  btnCopy.addEventListener("click", () => {
+    const s = drawLast || cardTxt.textContent || "";
+    try { navigator.clipboard.writeText(s); } catch (e) { }
+    btnCopy.textContent = "已复制";
+    setTimeout(() => { btnCopy.textContent = "复制"; }, 1200);
+  });
+
+  btnHist.addEventListener("click", () => {
+    const open = !histBox.classList.contains("k2-open");
+    histBox.classList.toggle("k2-open", open);
+    btnHist.classList.toggle("k2-on", open);
+    scheduleFit(node, root, body, true);
+  });
+
+  const applyDraw = (payload) => {
+    const lines = String(payload || "").split("\n");
+    if (lines.length < 4) return;
+    const text = lines[0];
+    const src = lines[1] || "-";
+    const rr = lines[2] || "R";
+    const sd = lines[3] || "0";
+    const size = lines[4] || "0";
+    drawLast = text;
+
+    rareTag.style.display = "";
+    rareTag.className = "k2-rare r-" + rr;
+    rareTag.textContent = rr;
+    cardBox.className = "k2-card k2-flip r-" + rr;
+    setTimeout(() => cardBox.classList.remove("k2-flip"), 700);
+    sfx(rr === "SSR" ? "ssr" : "flip");
+
+    typeOut(text);
+
+    clearKids(metaRow);
+    const chips = [`来源 ${src}`, `种子 ${sd}`, `池 ${size} 条`, `${text.length} 字`];
+    for (const c of chips) metaRow.appendChild(el("span", null, c));
+
+    const arr = histArr();
+    arr.push({ text: text.slice(0, 400), r: rr, src, seed: sd });
+    if (arr.length > 20) arr.splice(0, arr.length - 20);
+    renderHist();
+    scheduleFit(node, root, body, true);
+  };
+
+  renderHist();
+
+  let spotTs = 0;
+  body.addEventListener("mousemove", (ev) => {
+    const now = Date.now();
+    if (now - spotTs < 16) return;
+    spotTs = now;
+    const t = ev.target && ev.target.closest ? ev.target.closest(".k2-big,.k2-tile") : null;
+    if (!t || !t.getBoundingClientRect || !t.style || !t.style.setProperty) return;
+    const r = t.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    t.style.setProperty("--mx", (((ev.clientX - r.left) / r.width) * 100).toFixed(1) + "%");
+    t.style.setProperty("--my", (((ev.clientY - r.top) / r.height) * 100).toFixed(1) + "%");
+  });
+
+  body.addEventListener("click", (ev) => {
+    const t = ev.target && ev.target.closest ? ev.target.closest("button") : null;
+    if (t && t !== btnSfx) sfx("tick");
+  });
+
   function sync() {
     let partsOn = 0;
     for (let i = 1; i <= PART_COUNT; i++) {
@@ -771,7 +1264,7 @@ function buildPanel(node) {
     const ms = miscState(node);
     bigMisc.classList.toggle("on", ms === "all");
     bigMisc.classList.toggle("k2-part", ms === "some");
-    mMiscBadge.textContent = `${partsOn} / ${PART_COUNT}`;
+    rollTo(mMiscBadge, `${partsOn} / ${PART_COUNT}`);
 
     bigCN.classList.toggle("on", !!readW(node, W_NAME.cn, false));
     bigNS.classList.toggle("on", !!readW(node, W_NAME.nsfw, false));
@@ -800,7 +1293,7 @@ function buildPanel(node) {
 
     const n = countActive(node);
     const onlyMisc = ms === "all" && n === PART_COUNT;
-    chipTotal.textContent = `${n} / ${PART_COUNT + 6}`;
+    rollTo(chipTotal, `${n} / ${PART_COUNT + 6}`);
     chipTotal.classList.toggle("k2-hot", n > 0);
     chipTotal.classList.toggle("k2-zero", n === 0);
 
@@ -820,7 +1313,7 @@ function buildPanel(node) {
     }
   }
 
-  return { root, body, sync };
+  return { root, body, sync, applyDraw };
 }
 
 function miscState(node) {
@@ -1054,7 +1547,18 @@ app.registerExtension({
       for (const w of node.widgets) hideWidget(w);
     }
 
-    const { root, body, sync } = buildPanel(node);
+    const { root, body, sync, applyDraw } = buildPanel(node);
+
+    bindDrawFeed();
+    const regFeed = () => { if (node.id != null) DRAW_MAP.set(node.id, applyDraw); };
+    regFeed();
+    setTimeout(regFeed, 300);
+    chain(node, "onRemoved", function () { try { DRAW_MAP.delete(node.id); } catch (e) { } });
+    chain(node, "onExecuted", function (msg) {
+      const t = msg && msg.text;
+      const arr = Array.isArray(t) ? t : (t != null ? [t] : []);
+      if (arr.length) applyDraw(arr[arr.length - 1]);
+    });
 
     let domWidget = null;
     if (typeof node.addDOMWidget === "function") {
