@@ -122,25 +122,31 @@ class Krea2PromptPicker:
         ext = _external_dir(prompt_dir)
 
         active_pools = []
+        pool_labels = []
 
         if kw.get("超强中文模式", False):
             pool = _pool_from_dir(ext, "part-zc.json") or PL.load_super()
             if pool:
                 active_pools.append(pool)
+                pool_labels.append("超强中文")
 
         if kw.get("NSFW", False):
             pool = _pool_from_dir(ext, "part13.json") or PL.load_krea2_nsfw()
             if pool:
                 active_pools.append(pool)
+                pool_labels.append("18+")
 
-        for tag, hzfile in (("大呲花词库", "part-hz1.json"), ("KOOK词库", "part-hz2.json"),
-                            ("SFW词库", "part-sfw.json"), ("19+词库", "part-19.json")):
+        for tag, hzfile, label in (("大呲花词库", "part-hz1.json", "大呲花"),
+                                   ("KOOK词库", "part-hz2.json", "KOOK"),
+                                   ("SFW词库", "part-sfw.json", "SFW"),
+                                   ("19+词库", "part-19.json", "19+")):
             if not kw.get(tag, False):
                 continue
             pool = _pool_from_dir(ext, hzfile) or PL.load_cleaned(
                 PL.find_file("krea2", hzfile))
             if pool:
                 active_pools.append(pool)
+                pool_labels.append(label)
 
         parts = None
         for i in range(1, self.PART_COUNT + 1):
@@ -154,21 +160,48 @@ class Krea2PromptPicker:
                 pool = parts.get(name, [])
             if pool:
                 active_pools.append(pool)
+                pool_labels.append(name.upper())
 
         if not active_pools:
-            return ("（未开启任何提示词源）",)
+            return {"ui": {"text": ["（未开启任何提示词源）"]}, "result": ("（未开启任何提示词源）",)}
 
         if mode == "single":
-            result = rng.choice(rng.choice(active_pools))
+            idx = rng.randrange(len(active_pools))
+            picked = active_pools[idx]
+            result = rng.choice(picked)
+            source = pool_labels[idx]
+            pool_size = len(picked)
         else:
-            result = separator.join(rng.choice(p) for p in active_pools)
+            chunks = []
+            for i, p in enumerate(active_pools):
+                chunks.append(rng.choice(p))
+            result = separator.join(chunks)
+            source = " + ".join(pool_labels)
+            pool_size = sum(len(p) for p in active_pools)
 
         if kw.get("触发词开关", False):
             trigger = str(kw.get("触发词内容", "")).strip()
             if trigger:
                 result = trigger + separator + result if result else trigger
 
-        return (result,)
+        tag_n = len([t for t in result.split(",") if t.strip()])
+        score = max(tag_n, len(result) // 12)
+        if score >= 30:
+            rarity = "SSR"
+        elif score >= 16:
+            rarity = "SR"
+        else:
+            rarity = "R"
+
+        used_seed = int(seed) if seed else 0
+        payload = "\n".join([
+            result,
+            source,
+            rarity,
+            str(used_seed),
+            str(pool_size),
+        ])
+        return {"ui": {"text": [payload]}, "result": (result,)}
 
 
 def startup_check():
