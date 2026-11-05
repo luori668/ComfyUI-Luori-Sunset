@@ -118,7 +118,8 @@ class Krea2PromptPicker:
 
 
     def pick(self, prompt_dir, seed, mode, separator, **kw):
-        rng = random.Random(seed if seed else None)
+        used_seed = int(seed) if seed else random.SystemRandom().randrange(1, 0xFFFFFFFFFFFFFFFF)
+        rng = random.Random(used_seed)
         ext = _external_dir(prompt_dir)
 
         active_pools = []
@@ -193,7 +194,6 @@ class Krea2PromptPicker:
         else:
             rarity = "R"
 
-        used_seed = int(seed) if seed else 0
         payload = "\n".join([
             result,
             source,
