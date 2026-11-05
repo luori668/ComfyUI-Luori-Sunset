@@ -24,7 +24,7 @@ def load_json(path):
     except Exception:
         return None
     with _LOCK:
-        if len(_CACHE) > 24:
+        if len(_CACHE) > 64:
             _CACHE.clear()
         _CACHE[key] = data
     return data
