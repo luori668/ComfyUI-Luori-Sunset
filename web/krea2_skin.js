@@ -919,16 +919,17 @@ function buildPanel(node) {
 
   const autoSeedMode = () => {
     if (seedModeManual) return;
+    if (!node.properties) node.properties = {};
+    if (typeof node.properties[SEED_FIXED_PROP] === "boolean") return;
     const idx = (node.widgets || []).findIndex((w) => w.name === W_NAME.seed);
     const fromWorkflow = Array.isArray(node.widgets_values) && node.widgets_values.length > 0;
     let base = 0;
     if (fromWorkflow && idx >= 0) base = Number(node.widgets_values[idx]) || 0;
     else if (fromWorkflow) base = Number(readW(node, W_NAME.seed, 0)) || 0;
-    if (!node.properties) node.properties = {};
     node.properties[SEED_FIXED_PROP] = base > 0;
   };
   autoSeedMode();
-  chain(node, "onConfigure", function () { autoSeedMode(); });
+  chain(node, "onConfigure", function () { autoSeedMode(); paintSeed(); renderHist(); });
 
   const seedMode = () =>
     (node.properties && node.properties[SEED_FIXED_PROP] === true) ? "fixed" : "rand";
