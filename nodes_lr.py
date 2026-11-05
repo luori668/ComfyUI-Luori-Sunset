@@ -4,9 +4,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
+import os
 import random
 import re
+import shutil
+import time
 from itertools import product
 from pathlib import Path
 from typing import Dict, Iterable, Mapping, Sequence
@@ -6946,28 +6950,57 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "SunsetLRPromptBuilder": "LR提示词",
+    "SunsetLRPromptBuilder": "✨ 落日-权威摄影-提示词自选搭配",
 }
 
 LR_PRESETS_FILE = LIBRARY_ROOT / "user_presets.json"
 
 
-def _read_lr_presets():
+def _quarantine_lr_presets():
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    target = LR_PRESETS_FILE.with_name("user_presets.broken-%s.json" % stamp)
     try:
-        if LR_PRESETS_FILE.exists():
-            data = json.loads(LR_PRESETS_FILE.read_text(encoding="utf-8-sig"))
-            if isinstance(data, dict):
-                return data
-    except Exception:
-        pass
-    return {}
+        LR_PRESETS_FILE.replace(target)
+        return target
+    except OSError:
+        return None
+
+
+def _read_lr_presets(strict=False):
+    if not LR_PRESETS_FILE.exists():
+        return {}
+    try:
+        text = LR_PRESETS_FILE.read_text(encoding="utf-8-sig")
+        data = json.loads(text) if text.strip() else {}
+        if not isinstance(data, dict):
+            raise ValueError("preset root is not an object")
+        return data
+    except Exception as exc:
+        if strict:
+            kept = _quarantine_lr_presets()
+            logging.warning("[Sunset] 预设文件无法解析，已隔离到 %s：%s", kept, exc)
+            raise
+        logging.warning("[Sunset] 预设文件无法解析（文件未改动）：%s", exc)
+        return {}
 
 
 def _write_lr_presets(data):
     LR_PRESETS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    LR_PRESETS_FILE.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    payload = json.dumps(data, ensure_ascii=False, indent=2)
+    if LR_PRESETS_FILE.exists():
+        try:
+            shutil.copy2(
+                LR_PRESETS_FILE,
+                LR_PRESETS_FILE.with_name("user_presets.bak.json"),
+            )
+        except OSError:
+            pass
+    temp = LR_PRESETS_FILE.with_name("user_presets.tmp.json")
+    with open(temp, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temp, LR_PRESETS_FILE)
 
 
 try:
@@ -6985,7 +7018,10 @@ try:
             body = None
         if not isinstance(body, dict):
             return _lr_web.json_response({"error": "bad request"}, status=400)
-        data = _read_lr_presets()
+        try:
+            data = _read_lr_presets(strict=True)
+        except Exception:
+            return _lr_web.json_response({"error": "preset_file_broken"}, status=500)
         action = body.get("action")
         if action == "save":
             name = str(body.get("name") or "").strip()
@@ -6997,10 +7033,14 @@ try:
             data.pop(str(body.get("name") or ""), None)
         else:
             return _lr_web.json_response({"error": "bad request"}, status=400)
-        _write_lr_presets(data)
+        try:
+            _write_lr_presets(data)
+        except OSError:
+            logging.exception("[Sunset] 保存预设失败")
+            return _lr_web.json_response({"error": "preset_write_failed"}, status=500)
         return _lr_web.json_response(data)
 
     PromptServer.instance.routes.get("/luori/lr_presets")(_lr_presets_get)
     PromptServer.instance.routes.post("/luori/lr_presets")(_lr_presets_post)
-except Exception:
-    pass
+except Exception as exc:
+    logging.warning("[Sunset] LR 预设接口未注册：%s", exc)
