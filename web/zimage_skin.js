@@ -1759,7 +1759,7 @@ function buildLRPanel(node) {
   const head = el("div", "zs-head");
   head.appendChild(el("div", "zs-dot"));
   head.appendChild(el("div", "zs-title", "LR BUILDER"));
-  const chip = el("div", "zs-chip", "落日提示词预设");
+  const chip = el("div", "zs-chip", "✨ 权威摄影·自选搭配");
   head.appendChild(chip);
   body.appendChild(head);
 
