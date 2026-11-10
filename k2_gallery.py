@@ -148,6 +148,20 @@ def _public(row):
     }
 
 
+def _dir_bytes(path):
+    total = 0
+    try:
+        for entry in Path(path).iterdir():
+            if entry.is_file():
+                try:
+                    total += entry.stat().st_size
+                except OSError:
+                    pass
+    except OSError:
+        pass
+    return total
+
+
 def list_payload():
     data = _read()
     items = data.get("items", [])
@@ -156,6 +170,7 @@ def list_payload():
         "total": len(items),
         "limit": LIMIT,
         "warn": WARN_AT,
+        "bytes": _dir_bytes(THUMBS) + _dir_bytes(UPLOADS),
     }
 
 
