@@ -1,4 +1,5 @@
 import { app } from "../../scripts/app.js";
+import { api } from "../../scripts/api.js";
 
 const SKIN_VERSION = "3.15";
 
@@ -71,8 +72,7 @@ function loadPrefs() {
 }
 loadPrefs();
 
-function applyTheme(root) {
-  const t = THEMES[themeIdx];
+function applyTheme(root) {  const t = THEMES[themeIdx];
   THEME.orange = t.orange;
   THEME.pink = t.pink;
   THEME.purple = t.purple;
@@ -90,6 +90,36 @@ function applyTheme(root) {
     root.style.setProperty("--g2", t.g2);
   }
 }
+
+function paintZs(root, t) {
+  if (!root || !root.style) return;
+  root.style.setProperty("--o", t.orange);
+  root.style.setProperty("--p", t.pink);
+  root.style.setProperty("--v", t.purple);
+  root.style.setProperty("--cy", t.cyan);
+  root.style.setProperty("--c1", t.orange);
+  root.style.setProperty("--c2", t.pink);
+  root.style.setProperty("--c3", t.purple);
+  root.style.setProperty("--bgtop", t.bg1);
+  root.style.setProperty("--bgbtm", t.bg2);
+}
+
+window.__k2Shared = {
+  sfx: (kind) => sfx(kind),
+  sfxForce: (kind) => sfxRaw(kind),
+  warm: () => { acGet(); },
+  sfxEnabled: () => sfxOn,
+  themes: THEMES,
+  index: () => themeIdx,
+  cycle: () => {
+    themeIdx = (themeIdx + 1) % THEMES.length;
+    storeSet("k2_theme", String(themeIdx));
+    const t = THEMES[themeIdx];
+    document.querySelectorAll(".k2-root").forEach((r) => { try { applyTheme(r); } catch (e) { } });
+    document.querySelectorAll(".zs-root").forEach((r) => { try { paintZs(r, t); } catch (e) { } });
+    return themeIdx;
+  },
+};
 
 function acGet() {
   if (actx) {
@@ -118,8 +148,7 @@ function tone(c, freq, t0, dur, type, vol) {
   o.stop(t0 + dur + 0.03);
 }
 
-function sfx(kind) {
-  if (!sfxOn) return;
+function sfxRaw(kind) {
   const c = acGet();
   if (!c) return;
   try {
@@ -134,6 +163,11 @@ function sfx(kind) {
     } else if (kind === "on") tone(c, 520, t, 0.09, "sine", 0.05);
     else if (kind === "off") tone(c, 320, t, 0.09, "sine", 0.05);
   } catch (e) { }
+}
+
+function sfx(kind) {
+  if (!sfxOn) return;
+  sfxRaw(kind);
 }
 
 function rollTo(host, text) {
@@ -180,6 +214,62 @@ const PART_COUNT = 12;
 const partName = (i) => `提示词${i}`;
 
 const DRAW_MAP = new Map();
+const K2G_PENDING = new Map();
+let k2gHooked = false;
+
+const k2gFind = (id) => {
+  try {
+    if (app.graph && typeof app.graph.getNodeById === "function") return app.graph.getNodeById(id);
+    const list = (app.graph && app.graph._nodes) || [];
+    return list.find((n) => n.id === id) || null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const k2gHook = () => {
+  if (k2gHooked) return;
+  k2gHooked = true;
+  const drop = () => { K2G_PENDING.clear(); };
+  api.addEventListener("execution_error", drop);
+  api.addEventListener("execution_interrupted", drop);
+  api.addEventListener("execution_success", async (ev) => {
+    const pid = ev && ev.detail && ev.detail.prompt_id;
+    if (!pid || !K2G_PENDING.size) return;
+    const now = Date.now();
+    const jobs = [];
+    for (const [nodeId, draw] of K2G_PENDING.entries()) {
+      K2G_PENDING.delete(nodeId);
+      if (draw.at && now - draw.at > 600000) continue;
+      jobs.push([nodeId, draw]);
+    }
+    if (!jobs.length) return;
+    for (const pair of jobs) {
+      const nodeId = pair[0];
+      const draw = pair[1];
+      const target = k2gFind(nodeId);
+      if (!target) continue;
+      const props = target.properties || {};
+      const autoOn = typeof props.__k2AutoSave === "boolean" ? props.__k2AutoSave : true;
+      if (!autoOn) continue;
+      try {
+        await api.fetchApi("/luori/k2/gallery", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: draw.prompt,
+            seed: draw.seed,
+            source: draw.source,
+            rarity: draw.rarity,
+            prompt_id: pid,
+            require_image: true,
+            node_id: nodeId,
+          }),
+        });
+      } catch (e) { }
+    }
+  });
+};
 let drawBound = false;
 
 function bindDrawFeed() {
@@ -634,12 +724,55 @@ function injectCSS() {
 .k2-dmeta>span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   padding:2px 8px;border-radius:99px;font:600 9.5px/1.5 inherit;color:var(--dim);
   border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.035);}
-.k2-dbar{display:flex;align-items:center;gap:6px;margin-top:7px;}
+.k2-dbar{display:flex;align-items:center;gap:5px;margin-top:7px;overflow-x:auto;scrollbar-width:none;}
 .k2-dsp{flex:1;min-width:0;}
-.k2-dbtn{flex:0 0 auto;height:24px;padding:0 10px;border-radius:99px;cursor:pointer;white-space:nowrap;
+.k2-dbtn{flex:0 0 auto;height:24px;padding:0 7px;border-radius:99px;cursor:pointer;white-space:nowrap;
   font:700 10px/1 inherit;color:var(--dim);border:1px solid rgba(255,255,255,.12);
   background:rgba(255,255,255,.04);transition:color .16s,border-color .16s,background .16s;}
 .k2-dbtn:hover{color:var(--tx);border-color:rgba(255,255,255,.26);}
+.k2-dbtn.k2-glow{position:relative;overflow:hidden;color:#fff;border:1px solid transparent;
+  font-weight:700;letter-spacing:.4px;text-shadow:0 0 7px rgba(255,255,255,.6);
+  background:
+    linear-gradient(135deg,rgba(26,12,48,.86),rgba(26,12,48,.86)) padding-box,
+    linear-gradient(90deg,#FF3D71,#FF8A3D,#FFD166,#4ADE80,#22D3EE,#8B2FF7,#FF2E93,#FF3D71) border-box;
+  background-size:100% 100%,300% 100%;
+  box-shadow:
+    0 0 0 1px rgba(255,61,113,.66),
+    0 0 9px rgba(255,61,113,.62),
+    0 0 20px rgba(34,211,238,.42),
+    0 0 34px rgba(139,47,247,.34),
+    inset 0 0 12px rgba(255,255,255,.12);
+  animation:k2gRainbow 2.2s linear infinite,k2gNeon 2.6s ease-in-out infinite;}
+.k2-dbtn.k2-glow::after{content:"";position:absolute;top:0;left:0;width:46%;height:100%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.68),transparent);
+  transform:translateX(-160%);opacity:0;pointer-events:none;
+  animation:k2gSweep 2.4s ease-in-out infinite;}
+.k2-dbtn.k2-glow:hover{color:#fff;
+  background:
+    linear-gradient(135deg,rgba(52,26,86,.92),rgba(52,26,86,.92)) padding-box,
+    linear-gradient(90deg,#FF3D71,#FF8A3D,#FFD166,#4ADE80,#22D3EE,#8B2FF7,#FF2E93,#FF3D71) border-box;
+  background-size:100% 100%,300% 100%;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.5),
+    0 0 14px rgba(255,61,113,.8),
+    0 0 28px rgba(34,211,238,.6),
+    0 0 46px rgba(139,47,247,.5),
+    inset 0 0 16px rgba(255,255,255,.2);}
+@keyframes k2gRainbow{
+  0%{background-position:0 0,0% 50%;}
+  100%{background-position:0 0,300% 50%;}
+}
+@keyframes k2gNeon{
+  0%,100%{filter:brightness(1);}
+  50%{filter:brightness(1.32);}
+}
+@keyframes k2gSweep{
+  0%{transform:translateX(-160%);opacity:0;}
+  55%{transform:translateX(-160%);opacity:0;}
+  65%{opacity:.85;}
+  88%{transform:translateX(320%);opacity:0;}
+  100%{transform:translateX(320%);opacity:0;}
+}
 .k2-dbtn.k2-on{color:#FFD8A8;border-color:rgba(255,138,61,.45);background:rgba(255,138,61,.12);}
 .k2-hist{margin-top:7px;display:none;}
 .k2-hist.k2-open{display:block;}
@@ -656,7 +789,8 @@ function injectCSS() {
   font:10.5px/1.5 inherit;color:var(--tx);}
 .k2-dempty{padding:4px 2px;font-size:10.5px;color:#7A7299;}
 
-.k2-dbar{flex-wrap:wrap;}
+.k2-dbar{flex-wrap:nowrap;}
+.k2-dbar::-webkit-scrollbar{display:none;}
 .k2-big::after,.k2-tile::after{content:"";position:absolute;inset:0;border-radius:inherit;
   pointer-events:none;opacity:0;transition:opacity .2s;
   background:radial-gradient(84px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.2),transparent 62%);}
@@ -673,6 +807,108 @@ function injectCSS() {
 @media (prefers-reduced-motion:reduce){
   .k2-roll>.k2-rin,.k2-roll>.k2-rout{animation:none;}
   .k2-roll>.k2-rout{display:none;}
+}
+
+.k2g-mask{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;
+  background:rgba(6,4,14,.66);backdrop-filter:blur(8px);opacity:0;transition:opacity .16s ease-out;}
+.k2g-mask.on{opacity:1;}
+.k2g-win{position:relative;width:min(1600px,98vw);height:min(1020px,95vh);display:flex;flex-direction:column;border-radius:16px;
+  overflow:hidden;transform:translateY(12px);transition:transform .18s cubic-bezier(.22,1,.36,1);
+  background:linear-gradient(180deg,var(--bg1,#191134),var(--bg2,#100B1F));border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 30px 90px rgba(0,0,0,.72),inset 0 1px 0 rgba(255,255,255,.08);color:#EDE9FE;
+  font:12px/1.45 "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+.k2g-mask.on .k2g-win{transform:translateY(0);}
+.k2g-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08);
+  background:linear-gradient(90deg,var(--g1,rgba(255,46,147,.18)),transparent 62%);}
+.k2g-title{font-size:14px;font-weight:600;letter-spacing:.4px;white-space:nowrap;}
+.k2g-count{font-size:11px;color:#9A90C4;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.k2g-bar{width:96px;height:4px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden;flex:0 0 auto;}
+.k2g-bar>i{display:block;height:100%;width:0;border-radius:2px;background:linear-gradient(90deg,var(--o,#FF8A3D),var(--p,#FF2E93));transition:width .2s;}
+.k2g-search{flex:1;min-width:110px;max-width:280px;height:30px;padding:0 10px;border-radius:8px;
+  border:1px solid rgba(255,255,255,.12);background:rgba(0,0,0,.28);color:#EDE9FE;font:12px/1 inherit;outline:none;}
+.k2g-search:focus{border-color:var(--o,#FF8A3D);box-shadow:0 0 0 2px rgba(255,138,61,.14);}
+.k2g-x{width:30px;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.04);color:#EDE9FE;cursor:pointer;font-size:15px;line-height:1;flex:0 0 auto;}
+.k2g-x:hover{background:rgba(255,61,113,.18);border-color:rgba(255,61,113,.5);}
+.k2g-warn{display:none;align-items:center;gap:8px;padding:9px 18px;font-size:12px;color:#FFD9DE;
+  background:linear-gradient(90deg,rgba(255,61,113,.3),rgba(255,61,113,.05));border-bottom:1px solid rgba(255,61,113,.38);}
+.k2g-warn.on{display:flex;}
+.k2g-warn b{color:#fff;}
+.k2g-tools{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:10px 18px;border-bottom:1px solid rgba(255,255,255,.07);}
+.k2g-chip{padding:5px 11px;border-radius:99px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);
+  color:#B9AFE0;font:11px/1 inherit;cursor:pointer;transition:all .12s;}
+.k2g-chip:hover{border-color:rgba(255,255,255,.3);color:#EDE9FE;}
+.k2g-sort{height:26px;padding:0 7px;border-radius:8px;font:11px/1 inherit;color:#E6DFFF;
+  cursor:pointer;outline:none;background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.16);transition:border-color .12s;}
+.k2g-sort:hover{border-color:rgba(255,255,255,.32);}
+.k2g-sort option{background:#1B1333;color:#EDE9FE;}
+.k2g-chip.on{color:#12071F;background:linear-gradient(135deg,var(--o,#FF8A3D),var(--p,#FF2E93));border-color:transparent;font-weight:600;}
+.k2g-sp{flex:1;}
+.k2g-act{height:30px;padding:0 12px;border-radius:8px;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.05);color:#EDE9FE;font:11px/1 inherit;cursor:pointer;transition:all .12s;}
+.k2g-act:hover{border-color:var(--o,#FF8A3D);box-shadow:0 0 12px rgba(255,138,61,.18);}
+.k2g-grid{flex:1;overflow:auto;padding:16px 18px 22px;display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;align-content:start;}
+.k2g-card{display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.09);transition:transform .14s ease,border-color .14s,box-shadow .14s;}
+.k2g-card:hover{transform:translateY(-2px);border-color:rgba(255,138,61,.55);box-shadow:0 12px 28px rgba(0,0,0,.5);}
+.k2g-thumb{position:relative;width:100%;aspect-ratio:3/4;background:rgba(0,0,0,.3);
+  overflow:hidden;cursor:zoom-in;}
+.k2g-thumb img{width:100%;height:100%;object-fit:contain;display:block;transition:transform .25s ease;}
+.k2g-card:hover .k2g-thumb img{transform:scale(1.02);}
+.k2g-grid::-webkit-scrollbar{width:9px;}
+.k2g-grid::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:5px;}
+.k2g-grid::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.28);}
+.k2g-grid::-webkit-scrollbar-track{background:transparent;}
+.k2g-thumb.none{display:flex;align-items:center;justify-content:center;color:#6B6191;font-size:11px;cursor:default;}
+.k2g-star{position:absolute;top:7px;right:7px;width:26px;height:26px;border-radius:50%;border:0;
+  background:rgba(0,0,0,.42);color:#9A90C4;cursor:pointer;font-size:13px;line-height:26px;text-align:center;backdrop-filter:blur(4px);}
+.k2g-star.on{color:#FFD166;text-shadow:0 0 10px rgba(255,209,102,.6);}
+.k2g-body{padding:9px 10px 6px;display:flex;flex-direction:column;gap:5px;}
+.k2g-txt{margin:0;font-size:11px;line-height:1.5;color:#D8D2F0;display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;word-break:break-word;min-height:33px;}
+.k2g-meta{display:flex;gap:6px;font-size:10px;color:#8A80B4;align-items:center;flex-wrap:wrap;}
+.k2g-acts{display:flex;border-top:1px solid rgba(255,255,255,.07);}
+.k2g-acts button{flex:1;height:30px;border:0;background:transparent;color:#9A90C4;font:10px/1 inherit;cursor:pointer;
+  transition:background .12s,color .12s;}
+.k2g-acts button:hover{background:rgba(255,255,255,.07);color:#EDE9FE;}
+.k2g-acts button.dg:hover{background:rgba(255,61,113,.18);color:#FF8FA3;}
+.k2g-empty{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  padding:70px 0;color:#6B6191;}
+.k2g-ei{font-size:34px;opacity:.5;}
+.k2g-foot{display:flex;align-items:center;gap:10px;padding:9px 18px;border-top:1px solid rgba(255,255,255,.07);
+  font-size:11px;color:#7F75A8;}
+.k2g-full{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:rgba(4,2,10,.88);backdrop-filter:blur(4px);}
+.k2g-full img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.7);}
+.k2g-full .k2g-x{position:absolute;top:16px;right:18px;}
+.k2g-conf{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;
+  background:rgba(4,2,10,.8);backdrop-filter:blur(4px);padding:20px;}
+.k2g-cbox{width:min(420px,90%);border-radius:14px;padding:20px;background:linear-gradient(180deg,var(--bg1,#191134),var(--bg2,#100B1F));
+  border:1px solid rgba(255,255,255,.12);box-shadow:0 24px 60px rgba(0,0,0,.7);}
+.k2g-ct{font-size:14px;font-weight:600;margin-bottom:8px;}
+.k2g-cp{font-size:11.5px;line-height:1.75;color:#A79CCE;margin:0 0 12px;}
+.k2g-cw{font-size:11px;line-height:1.6;color:#FF8FA3;background:rgba(255,61,113,.1);
+  border:1px solid rgba(255,61,113,.28);border-radius:8px;padding:8px 10px;margin-bottom:14px;}
+.k2g-cb{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+.k2g-btn{height:32px;padding:0 14px;border-radius:8px;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.05);color:#EDE9FE;font:12px/1 inherit;cursor:pointer;transition:all .12s;}
+.k2g-btn:hover{border-color:rgba(255,255,255,.32);}
+.k2g-btn.dg{background:linear-gradient(135deg,#FF3D71,#C2185B);border-color:transparent;color:#fff;font-weight:600;}
+.k2g-btn.dg:hover{filter:brightness(1.08);}
+.k2g-btn.pri{background:linear-gradient(135deg,var(--o,#FF8A3D),var(--p,#FF2E93));border-color:transparent;color:#12071F;font-weight:600;}
+.k2g-form{display:flex;flex-direction:column;gap:11px;}
+.k2g-lb{font-size:11px;color:#9A90C4;margin-bottom:4px;display:block;}
+.k2g-in{width:100%;border-radius:8px;border:1px solid rgba(255,255,255,.13);background:rgba(0,0,0,.3);
+  color:#EDE9FE;font:12px/1.5 inherit;padding:8px 10px;outline:none;box-sizing:border-box;}
+.k2g-in:focus{border-color:var(--o,#FF8A3D);}
+textarea.k2g-in{min-height:92px;resize:vertical;}
+.k2g-file{font-size:11px;color:#9A90C4;}
+@media (prefers-reduced-motion:reduce){
+  .k2g-mask,.k2g-win,.k2g-card,.k2g-thumb img{transition:none;}
+  .k2g-card:hover{transform:none;}
+  .k2-dbtn.k2-glow,.k2-dbtn.k2-glow::after{animation:none;}
 }
 
 `;
@@ -1038,6 +1274,39 @@ function buildPanel(node) {
   fSep.appendChild(sepInput);
   advBody.appendChild(fSep);
 
+  const fStrict = el("div", "k2-f");
+  fStrict.appendChild(el("div", "k2-fl", "严格单图 · 检测到多个 SaveImage 时报错"));
+  const segStrict = el("div", "k2-seg");
+  const stOn = el("button", null, "开启");
+  const stOff = el("button", null, "关闭");
+  stOn.onclick = () => { writeW(node, "严格单图", true); paintAdv(); };
+  stOff.onclick = () => { writeW(node, "严格单图", false); paintAdv(); };
+  segStrict.append(stOn, stOff);
+  fStrict.appendChild(segStrict);
+  advBody.appendChild(fStrict);
+
+  const fAuto = el("div", "k2-f");
+  fAuto.appendChild(el("div", "k2-fl", "自动存档（默认开启）· 运行结束把词和图存进词图库"));
+  const segAuto = el("div", "k2-seg");
+  const auOn = el("button", null, "开启");
+  const auOff = el("button", null, "关闭");
+  auOn.onclick = () => { if (!node.properties) node.properties = {}; node.properties.__k2AutoSave = true; paintAdv(); };
+  auOff.onclick = () => { if (!node.properties) node.properties = {}; node.properties.__k2AutoSave = false; paintAdv(); };
+  segAuto.append(auOn, auOff);
+  fAuto.appendChild(segAuto);
+  advBody.appendChild(fAuto);
+
+  function paintAdv() {
+    const strict = readW(node, "严格单图", true);
+    stOn.classList.toggle("on", !!strict);
+    stOff.classList.toggle("on", !strict);
+    const props = node.properties || {};
+    const auto = typeof props.__k2AutoSave === "boolean" ? props.__k2AutoSave : true;
+    auOn.classList.toggle("on", auto);
+    auOff.classList.toggle("on", !auto);
+  }
+  paintAdv();
+
   adv.appendChild(advBody);
   body.appendChild(adv);
 
@@ -1089,7 +1358,10 @@ function buildPanel(node) {
   const btnTheme = el("button", "k2-dbtn", "配色");
   btnTheme.type = "button";
   btnTheme.title = "切换面板配色（8 套）：霓虹 / 赛博蓝 / 暗金 / 极光 / 樱粉 / 深海 / 熔岩 / 幻紫";
-  btnBar.append(btnCopy, btnSkip, btnSfx, btnTheme, el("div", "k2-dsp"), btnHist);
+  const btnGallery = el("button", "k2-dbtn k2-glow", "词图库");
+  btnGallery.type = "button";
+  btnGallery.title = "我的词图库：看图 / 复制 / 删除 / 手动添加 / 导出";
+  btnBar.append(btnCopy, btnSkip, btnSfx, btnTheme, btnGallery, btnHist);
 
   btnSfx.classList.toggle("k2-on", sfxOn);
   applyTheme(root);
@@ -1205,6 +1477,8 @@ function buildPanel(node) {
     scheduleFit(node, root, body, true);
   });
 
+  let drawStamp = "";
+  let drawAt = 0;
   const applyDraw = (payload) => {
     const lines = String(payload || "").split("\n");
     if (lines.length < 4) return;
@@ -1213,6 +1487,11 @@ function buildPanel(node) {
     const rr = lines[2] || "R";
     const sd = lines[3] || "0";
     const size = lines[4] || "0";
+    const stamp = sd + "|" + src + "|" + text;
+    const now = Date.now();
+    if (stamp === drawStamp && now - drawAt < 1500) return;
+    drawStamp = stamp;
+    drawAt = now;
     drawLast = text;
 
     rareTag.style.display = "";
@@ -1230,12 +1509,408 @@ function buildPanel(node) {
 
     const arr = histArr();
     arr.push({ text: text.slice(0, 400), r: rr, src, seed: sd });
+    K2G_PENDING.set(node.id, { prompt: text, seed: sd, source: src, rarity: rr, at: Date.now() });
     if (arr.length > 20) arr.splice(0, arr.length - 20);
     renderHist();
     scheduleFit(node, root, body, true);
   };
 
   renderHist();
+
+  let galleryMask = null;
+  let galleryItems = [];
+  let galleryQ = "";
+  let gallerySrc = "";
+  let galleryStar = false;
+  let gallerySort = "new";
+
+  const closeGallery = () => {
+    if (!galleryMask) return;
+    const mask = galleryMask;
+    galleryMask = null;
+    mask.classList.remove("on");
+    setTimeout(() => { try { mask.remove(); } catch (e) { } }, 180);
+  };
+
+  const gReq = async (url, opts) => {
+    const res = await api.fetchApi(url, opts);
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (!res.ok) throw new Error((data && data.error) || ("HTTP " + res.status));
+    return data;
+  };
+
+  const gCopy = async (text, btn) => {
+    try {
+      await navigator.clipboard.writeText(String(text || ""));
+      if (btn) {
+        const old = btn.textContent;
+        btn.textContent = "已复制";
+        setTimeout(() => { btn.textContent = old; }, 900);
+      }
+      return true;
+    } catch (e) {
+      if (btn) btn.textContent = "失败";
+      return false;
+    }
+  };
+
+  const gReuse = (item) => {
+    writeW(node, W_NAME.seed, Number(item.seed) || 0);
+    if (!node.properties) node.properties = {};
+    node.properties.__k2SeedFixed = (Number(item.seed) || 0) > 0;
+    const key = SRC_KEY[item.source];
+    if (key) {
+      for (const k of Object.values(SRC_KEY)) if (k !== key) writeW(node, k, false);
+      writeW(node, key, true);
+    }
+    sync();
+    paintSeed();
+    closeGallery();
+  };
+
+  const gRemove = async (item, purge) => {
+    await gReq("/luori/k2/gallery/" + encodeURIComponent(item.id) + (purge ? "?mode=purge" : ""), { method: "DELETE" });
+    galleryItems = galleryItems.filter((x) => x.id !== item.id);
+    return galleryItems.length;
+  };
+
+  const openGallery = async (opts = {}) => {
+    if (galleryMask) { closeGallery(); return; }
+    const mask = el("div", "k2g-mask");
+    applyTheme(mask);
+    const win = el("div", "k2g-win");
+    mask.appendChild(win);
+    galleryMask = mask;
+    document.body.append(mask);
+    requestAnimationFrame(() => mask.classList.add("on"));
+    mask.addEventListener("click", (ev) => { if (ev.target === mask) closeGallery(); });
+    const onKey = (ev) => {
+      if (!galleryMask) { document.removeEventListener("keydown", onKey); return; }
+      if (ev.key === "Escape") {
+        const conf = win.querySelector(".k2g-conf");
+        if (conf) { conf.remove(); return; }
+        closeGallery();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+
+    const head = el("div", "k2g-head");
+    head.appendChild(el("div", "k2g-title", "🗂 我的词图库"));
+    const countEl = el("div", "k2g-count", "读取中…");
+    const bar = el("div", "k2g-bar");
+    const barFill = el("i");
+    bar.appendChild(barFill);
+    const search = el("input", "k2g-search");
+    search.placeholder = "搜索提示词 / 种子 / 来源";
+    search.spellcheck = false;
+    search.oninput = () => { galleryQ = search.value.trim().toLowerCase(); render(); };
+    const btnX = el("button", "k2g-x", "×");
+    btnX.type = "button";
+    btnX.onclick = closeGallery;
+    head.append(countEl, bar, el("div", "k2g-sp"), search, btnX);
+
+    const warn = el("div", "k2g-warn");
+    const warnIcon = el("b", null, "⚠");
+    const warnText = el("span");
+    warn.append(warnIcon, warnText);
+
+    const tools = el("div", "k2g-tools");
+    const srcChips = [];
+    const srcList = [["", "全部"], ["文生图", "文生图"], ["超强中文", "超强中文"],
+                     ["18+", "18+"], ["大呲花", "大呲花"],
+                     ["KOOK", "KOOK"], ["SFW", "SFW"], ["19+", "19+"], ["手动", "手动"]];
+    const knownSrc = new Set(srcList.map((x) => x[0]));
+    for (const [value, label] of srcList) {
+      const chip = el("button", "k2g-chip" + (value === gallerySrc ? " on" : ""), label);
+      chip.type = "button";
+      chip.onclick = () => {
+        gallerySrc = value;
+        for (const c of srcChips) c.classList.toggle("on", c.dataset.v === value);
+        render();
+      };
+      chip.dataset.v = value;
+      srcChips.push(chip);
+      tools.appendChild(chip);
+    }
+    const chipStar = el("button", "k2g-chip", "★ 收藏");
+    chipStar.type = "button";
+    chipStar.onclick = () => { galleryStar = !galleryStar; chipStar.classList.toggle("on", galleryStar); render(); };
+    const addSrcChip = (value) => {
+      if (!value || knownSrc.has(value)) return;
+      knownSrc.add(value);
+      const chip = el("button", "k2g-chip" + (value === gallerySrc ? " on" : ""), value);
+      chip.type = "button";
+      chip.dataset.v = value;
+      chip.onclick = () => {
+        gallerySrc = value;
+        for (const c of srcChips) c.classList.toggle("on", c.dataset.v === value);
+        render();
+      };
+      srcChips.push(chip);
+      tools.insertBefore(chip, chipStar);
+    };
+    const spacer = el("div", "k2g-sp");
+    const btnAdd = el("button", "k2g-act", "+ 手动添加");
+    btnAdd.type = "button";
+    btnAdd.onclick = () => askAdd();
+    const btnExp = el("button", "k2g-act", "⬇ 导出 TXT");
+    btnExp.type = "button";
+    btnExp.onclick = () => {
+      const a = document.createElement("a");
+      a.href = api.apiURL("/luori/k2/gallery/export" + (galleryStar ? "?star=1" : ""));
+      a.download = "luori_prompts_" + Date.now() + ".txt";
+      document.body.append(a);
+      a.click();
+      a.remove();
+    };
+    const sortSel = el("select", "k2g-sort");
+    sortSel.title = "排序方式";
+    [["new", "最新优先"], ["old", "最早优先"], ["nameAsc", "名称 A→Z"],
+     ["nameDesc", "名称 Z→A"], ["seedAsc", "种子小→大"], ["seedDesc", "种子大→小"]]
+      .forEach(([v, t]) => {
+        const op = el("option", null, t);
+        op.value = v;
+        if (v === gallerySort) op.selected = true;
+        sortSel.appendChild(op);
+      });
+    sortSel.onchange = () => { gallerySort = sortSel.value; render(); };
+    tools.append(chipStar, sortSel, spacer, btnAdd, btnExp);
+
+    const grid = el("div", "k2g-grid");
+    const foot = el("div", "k2g-foot", "点缩略图看大图 · 双击提示词复制全文 · Esc 关闭");
+
+    win.append(head, warn, tools, grid, foot);
+
+    const updateCount = (total, limit, warnAt) => {
+      countEl.textContent = total + " / " + limit;
+      barFill.style.width = Math.min(100, (total / limit) * 100) + "%";
+      if (total >= warnAt) {
+        warn.classList.add("on");
+        warnText.textContent = total >= limit
+          ? "已存满 " + limit + " 条，新的存档会被拒绝，请先删除一些。"
+          : "已存 " + total + " 条，接近上限 " + limit + "，建议清理。";
+      } else {
+        warn.classList.remove("on");
+      }
+    };
+
+    const showFull = (item) => {
+      if (win.querySelector(".k2g-full")) return;
+      const full = el("div", "k2g-full");
+      const img = el("img");
+      img.src = api.apiURL("/luori/k2/gallery/image/" + encodeURIComponent(item.id));
+      img.alt = item.prompt || "";
+      const close = el("button", "k2g-x", "×");
+      close.type = "button";
+      close.onclick = () => full.remove();
+      full.append(img, close);
+      full.addEventListener("click", (ev) => { if (ev.target === full) full.remove(); });
+      win.appendChild(full);
+    };
+
+    const askDelete = (item) => {
+      const old = win.querySelector(".k2g-conf");
+      if (old) old.remove();
+      const conf = el("div", "k2g-conf");
+      const box = el("div", "k2g-cbox");
+      const title = el("div", "k2g-ct", "删除这一条？");
+      const desc = el("p", "k2g-cp", "提示词和缩略图会一起删除，此操作不可恢复。");
+      const note = el("div", "k2g-cw", "也可以选择同时删除 output 里的原图。删掉就无法恢复，且可能被其他工作流共用。");
+      const bar2 = el("div", "k2g-cb");
+      const cancel = el("button", "k2g-btn", "取消");
+      const keep = el("button", "k2g-btn", "只删存档");
+      const purge = el("button", "k2g-btn dg", "连原图一起删");
+      cancel.type = keep.type = purge.type = "button";
+      cancel.onclick = () => conf.remove();
+      keep.onclick = async () => {
+        keep.disabled = true;
+        try {
+          await gRemove(item, false);
+          conf.remove();
+          render();
+        } catch (e) { keep.textContent = "删除失败"; keep.disabled = false; }
+      };
+      purge.onclick = async () => {
+        purge.disabled = true;
+        try {
+          await gRemove(item, true);
+          conf.remove();
+          render();
+        } catch (e) { purge.textContent = "删除失败"; purge.disabled = false; }
+      };
+      bar2.append(cancel, keep, purge);
+      box.append(title, desc, note, bar2);
+      conf.appendChild(box);
+      conf.addEventListener("click", (ev) => { if (ev.target === conf) conf.remove(); });
+      win.appendChild(conf);
+    };
+
+    const askAdd = () => {
+      const old = win.querySelector(".k2g-conf");
+      if (old) old.remove();
+      const conf = el("div", "k2g-conf");
+      const box = el("div", "k2g-cbox");
+      const form = el("div", "k2g-form");
+      const l1 = el("label", "k2g-lb", "图片（PNG / JPG / WebP，≤ 20MB）");
+      const file = el("input");
+      file.type = "file";
+      file.accept = "image/*";
+      file.className = "k2g-file";
+      const l2 = el("label", "k2g-lb", "提示词");
+      const ta = el("textarea", "k2g-in");
+      ta.placeholder = "粘贴提示词…";
+      const bar2 = el("div", "k2g-cb");
+      const cancel = el("button", "k2g-btn", "取消");
+      const save = el("button", "k2g-btn pri", "保存到词图库");
+      cancel.type = save.type = "button";
+      cancel.onclick = () => conf.remove();
+      save.onclick = async () => {
+        if (!file.files || !file.files[0]) { file.style.outline = "1px solid #FF3D71"; return; }
+        if (!ta.value.trim()) { ta.style.outline = "1px solid #FF3D71"; return; }
+        save.disabled = true;
+        save.textContent = "保存中…";
+        const fd = new FormData();
+        fd.append("image", file.files[0]);
+        fd.append("prompt", ta.value);
+        try {
+          await gReq("/luori/k2/gallery/manual", { method: "POST", body: fd });
+          conf.remove();
+          await load();
+        } catch (e) {
+          save.disabled = false;
+          save.textContent = e.message === "full" ? "已满 1000 条" : "保存失败";
+        }
+      };
+      bar2.append(cancel, save);
+      form.append(l1, file, l2, ta, bar2);
+      box.appendChild(form);
+      conf.appendChild(box);
+      conf.addEventListener("click", (ev) => { if (ev.target === conf) conf.remove(); });
+      win.appendChild(conf);
+    };
+
+    const srcKey = (s) => {
+      const v = String(s || "").trim();
+      return v === "超强" || v === "分类" ? "文生图" : v;
+    };
+
+    const render = () => {
+      for (const it of galleryItems) addSrcChip(srcKey(it.source));
+      const list = galleryItems.filter((it) => {
+        if (galleryStar && !it.star) return false;
+        if (gallerySrc && srcKey(it.source) !== gallerySrc) return false;
+        if (galleryQ) {
+          const hay = (String(it.prompt || "") + " " + String(it.seed || "") + " " + String(it.source || "")).toLowerCase();
+          if (!hay.includes(galleryQ)) return false;
+        }
+        return true;
+      });
+      const byName = (x, y) => String(x.prompt || "").localeCompare(String(y.prompt || ""), "zh");
+      const byTime = (x, y) => String(x.created || "").localeCompare(String(y.created || ""));
+      list.sort((a, b) => {
+        const sa = a.star ? 1 : 0;
+        const sb = b.star ? 1 : 0;
+        if (sa !== sb) return sb - sa;
+        if (gallerySort === "old") return byTime(a, b);
+        if (gallerySort === "nameAsc") return byName(a, b);
+        if (gallerySort === "nameDesc") return byName(b, a);
+        if (gallerySort === "seedAsc") return (Number(a.seed) || 0) - (Number(b.seed) || 0);
+        if (gallerySort === "seedDesc") return (Number(b.seed) || 0) - (Number(a.seed) || 0);
+        return byTime(b, a);
+      });
+      grid.replaceChildren();
+      if (!list.length) {
+        const empty = el("div", "k2g-empty");
+        empty.append(el("div", "k2g-ei", "🗂"), el("div", null, galleryItems.length ? "没有匹配的记录" : "还没有存档，跑一次就有了"));
+        grid.appendChild(empty);
+        return;
+      }
+      for (const it of list) {
+        const card = el("article", "k2g-card");
+        const thumb = el("div", "k2g-thumb");
+        if (it.has_image) {
+          const img = el("img");
+          img.loading = "lazy";
+          img.decoding = "async";
+          img.src = api.apiURL("/luori/k2/gallery/thumb/" + encodeURIComponent(it.id));
+          img.alt = it.prompt || "";
+          img.onerror = () => { thumb.classList.add("none"); thumb.textContent = "图已丢失"; };
+          img.onclick = () => showFull(it);
+          thumb.appendChild(img);
+        } else {
+          thumb.classList.add("none");
+          thumb.textContent = "无图";
+        }
+        const star = el("button", "k2g-star" + (it.star ? " on" : ""), it.star ? "★" : "☆");
+        star.type = "button";
+        star.title = "收藏 / 取消收藏";
+        star.onclick = async (ev) => {
+          ev.stopPropagation();
+          const next = !it.star;
+          it.star = next;
+          star.textContent = next ? "★" : "☆";
+          star.classList.toggle("on", next);
+          try {
+            await gReq("/luori/k2/gallery/star", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id: it.id, star: next }),
+            });
+            render();
+          } catch (e) {
+            it.star = !next;
+            render();
+          }
+        };
+        thumb.appendChild(star);
+
+        const body = el("div", "k2g-body");
+        const txt = el("p", "k2g-txt", it.prompt || "");
+        txt.title = it.prompt || "";
+        txt.ondblclick = () => gCopy(it.prompt, null);
+        const meta = el("div", "k2g-meta");
+        meta.append(el("span", null, it.source || "未知"), el("span", null, "·"),
+                    el("span", null, it.rarity || "R"), el("span", null, "·"),
+                    el("span", null, String(it.seed || "-")));
+        body.append(txt, meta);
+
+        const acts = el("div", "k2g-acts");
+        const bCopy = el("button", null, "复制");
+        const bReuse = el("button", null, "重抽");
+        const bDel = el("button", "dg", "删除");
+        bCopy.type = bReuse.type = bDel.type = "button";
+        bCopy.onclick = () => gCopy(it.prompt, bCopy);
+        bReuse.onclick = () => gReuse(it);
+        bDel.onclick = () => askDelete(it);
+        if (opts && opts.hideReuse) acts.append(bCopy, bDel);
+        else acts.append(bCopy, bReuse, bDel);
+
+        card.append(thumb, body, acts);
+        grid.appendChild(card);
+      }
+    };
+
+    const load = async () => {
+      try {
+        const data = await gReq("/luori/k2/gallery");
+        galleryItems = Array.isArray(data.items) ? data.items : [];
+        updateCount(data.total ?? galleryItems.length, data.limit ?? 1000, data.warn ?? 950);
+        render();
+      } catch (e) {
+        countEl.textContent = "读取失败";
+        grid.replaceChildren();
+        const empty = el("div", "k2g-empty");
+        empty.append(el("div", "k2g-ei", "⚠"), el("div", null, "词图库读取失败：" + e.message));
+        grid.appendChild(empty);
+      }
+    };
+
+    await load();
+  };
+
+  btnGallery.onclick = openGallery;
+  window.__k2GalleryOpen = (o) => openGallery(o || {});
 
   let spotTs = 0;
   body.addEventListener("mousemove", (ev) => {
@@ -1541,6 +2216,7 @@ app.registerExtension({
 
     injectCSS();
     bindPointerWatch();          
+    k2gHook();
     installPainting(node);
     applyTriggerDefault(node);   
 
