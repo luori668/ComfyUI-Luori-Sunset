@@ -1654,16 +1654,6 @@ function buildPanel(node) {
     const btnAdd = el("button", "k2g-act", "+ 手动添加");
     btnAdd.type = "button";
     btnAdd.onclick = () => askAdd();
-    const btnExp = el("button", "k2g-act", "⬇ 导出 TXT");
-    btnExp.type = "button";
-    btnExp.onclick = () => {
-      const a = document.createElement("a");
-      a.href = api.apiURL("/luori/k2/gallery/export" + (galleryStar ? "?star=1" : ""));
-      a.download = "luori_prompts_" + Date.now() + ".txt";
-      document.body.append(a);
-      a.click();
-      a.remove();
-    };
     const sortSel = el("select", "k2g-sort");
     sortSel.title = "排序方式";
     [["new", "最新优先"], ["old", "最早优先"], ["nameAsc", "名称 A→Z"],
@@ -1675,7 +1665,7 @@ function buildPanel(node) {
         sortSel.appendChild(op);
       });
     sortSel.onchange = () => { gallerySort = sortSel.value; render(); };
-    tools.append(chipStar, sortSel, spacer, btnAdd, btnExp);
+    tools.append(chipStar, sortSel, spacer, btnAdd);
 
     const grid = el("div", "k2g-grid");
     const foot = el("div", "k2g-foot", "点缩略图看大图 · 双击提示词复制全文 · Esc 关闭");
