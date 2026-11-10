@@ -1,7 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
-const SKIN_VERSION = "3.15";
+const SKIN_VERSION = "3.18";
 
 
 const CONFIG = {
@@ -914,8 +914,9 @@ function injectCSS() {
   background:rgba(255,255,255,.05);color:#EDE9FE;font:11px/1 inherit;cursor:pointer;transition:all .12s;}
 .k2g-act:hover{border-color:var(--o,#FF8A3D);box-shadow:0 0 12px rgba(255,138,61,.18);}
 .k2g-grid{flex:1;overflow:auto;padding:16px 18px 22px;display:grid;
-  grid-template-columns:repeat(auto-fill,var(--k2g-card-w,240px));justify-content:start;gap:16px;align-content:start;}
-.k2g-grid.k2g-compact{--k2g-card-w:164px;gap:12px;}
+  grid-template-columns:repeat(auto-fill,minmax(270px,1fr));grid-auto-rows:max-content;
+  gap:18px;align-content:start;}
+.k2g-grid.k2g-compact{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
 @media (max-width:760px){
   .k2g-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
 }
@@ -933,16 +934,16 @@ function injectCSS() {
 .k2g-card:hover{transform:translateY(-2px);border-color:transparent;box-shadow:0 12px 30px rgba(0,0,0,.55),0 0 18px rgba(139,92,246,.32);}
 .k2g-card:hover::before{opacity:1;animation-duration:2.2s;animation-delay:0s;}
 @keyframes k2gFlow{0%{background-position:0% 50%;}100%{background-position:300% 50%;}}
-.k2g-skin{position:absolute;right:16px;bottom:46px;z-index:7;}
-.k2g-skin-btn{height:30px;padding:0 14px;border-radius:99px;cursor:pointer;display:inline-flex;
-  align-items:center;gap:7px;border:1px solid rgba(255,255,255,.18);background:rgba(20,12,38,.92);
-  color:#EDE9FE;font:11px/1 inherit;box-shadow:0 8px 22px rgba(0,0,0,.5);backdrop-filter:blur(8px);
+.k2g-skin{position:relative;flex:0 0 auto;z-index:9;}
+.k2g-skin-btn{height:26px;padding:0 11px;border-radius:99px;cursor:pointer;display:inline-flex;
+  align-items:center;gap:6px;border:1px solid rgba(255,255,255,.18);background:rgba(20,12,38,.92);
+  color:#EDE9FE;font:10.5px/1 inherit;box-shadow:0 4px 14px rgba(0,0,0,.45);backdrop-filter:blur(8px);
   transition:border-color .14s,box-shadow .14s;}
 .k2g-skin-btn:hover{border-color:rgba(255,255,255,.42);box-shadow:0 8px 26px rgba(139,92,246,.4);}
 .k2g-skin-btn>i{width:12px;height:12px;border-radius:50%;flex:0 0 auto;
   background:conic-gradient(#FF3D71,#FF8A3D,#FFD166,#4ADE80,#22D3EE,#8B2FF7,#FF2E93,#FF3D71);
   box-shadow:0 0 7px rgba(255,255,255,.4);}
-.k2g-skin-pop{position:absolute;right:0;bottom:38px;display:none;width:186px;padding:7px;
+.k2g-skin-pop{position:absolute;right:0;bottom:calc(100% + 9px);display:none;width:186px;padding:7px;z-index:40;
   border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(18,10,34,.97);
   box-shadow:0 18px 44px rgba(0,0,0,.72);backdrop-filter:blur(12px);}
 .k2g-skin-pop.on{display:block;}
@@ -952,9 +953,9 @@ function injectCSS() {
 .k2g-skin-item.on{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.06);color:#fff;}
 .k2g-skin-item>i{width:16px;height:16px;border-radius:5px;flex:0 0 auto;
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.28),0 0 8px rgba(0,0,0,.4);}
-.k2g-thumb{position:relative;width:100%;aspect-ratio:3/4;background:rgba(0,0,0,.3);
+.k2g-thumb{position:relative;width:100%;height:275px;flex:0 0 auto;background:rgba(0,0,0,.3);
   overflow:hidden;cursor:zoom-in;}
-.k2g-thumb img{width:100%;height:100%;object-fit:contain;display:block;transition:transform .25s ease;}
+.k2g-thumb img{width:100%;height:100%;object-fit:cover;object-position:center 26%;display:block;transition:transform .25s ease;}
 .k2g-card:hover .k2g-thumb img{transform:scale(1.02);}
 .k2g-grid::-webkit-scrollbar{width:9px;}
 .k2g-grid::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:5px;}
@@ -1009,6 +1010,7 @@ function injectCSS() {
 .k2g-selbar>button.dg:hover{background:rgba(255,61,113,.24);color:#fff;}
 .k2g-grid.k2g-compact .k2g-body,
 .k2g-grid.k2g-compact .k2g-acts{display:none;}
+.k2g-grid.k2g-compact .k2g-thumb{height:180px;}
 .k2g-grid.k2g-compact .k2g-card{border-radius:10px;}
 .k2g-full{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:24px;
   background:rgba(4,2,10,.88);backdrop-filter:blur(4px);}
@@ -1941,7 +1943,7 @@ function buildPanel(node) {
       skinPop.classList.toggle("on");
     });
     skinWrap.append(skinBtn, skinPop);
-    win.appendChild(skinWrap);
+    foot.insertBefore(skinWrap, pager);
     win.addEventListener("click", (ev) => {
       if (!skinWrap.contains(ev.target)) skinPop.classList.remove("on");
     });
