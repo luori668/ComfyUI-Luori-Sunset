@@ -2490,4 +2490,158 @@ function measurePanel(root) {
   return contentHeight(body);
 }
 
+const TOP_BTN_ID = "k2-top-gallery";
+
+function topToast(msg) {
+  const old = document.getElementById("k2-top-toast");
+  if (old) old.remove();
+  const t = document.createElement("div");
+  t.id = "k2-top-toast";
+  t.textContent = msg;
+  t.style.cssText =
+    "position:fixed;left:50%;top:72px;transform:translateX(-50%);z-index:99999;" +
+    "padding:8px 16px;border-radius:9px;background:rgba(24,14,44,.96);color:#FFD9D6;" +
+    "border:1px solid rgba(255,61,113,.55);font:12px/1.4 'Segoe UI','Microsoft YaHei',sans-serif;" +
+    "box-shadow:0 10px 30px rgba(0,0,0,.6);pointer-events:none;transition:opacity .3s;";
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity = "0"; }, 1800);
+  setTimeout(() => { try { t.remove(); } catch (e) { } }, 2200);
+}
+
+function injectTopBtnCSS() {
+  if (document.getElementById("k2-top-btn-css")) return;
+  const s = document.createElement("style");
+  s.id = "k2-top-btn-css";
+  s.textContent = `
+.k2-top-luori{
+  position:relative;overflow:hidden;box-sizing:border-box;
+  height:30px;padding:0 14px 0 12px;margin:0 4px;border-radius:8px;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  cursor:pointer;border:1px solid transparent;flex:0 0 auto;white-space:nowrap;
+  color:#fff;font:800 13px/1 'Segoe UI','Microsoft YaHei',sans-serif;letter-spacing:2px;
+  text-shadow:0 0 7px rgba(255,255,255,.72),0 1px 2px rgba(0,0,0,.55);
+  background:
+    linear-gradient(135deg,rgba(24,10,42,.94),rgba(24,10,42,.94)) padding-box,
+    linear-gradient(90deg,#FF3D71,#FF8A3D,#FFD166,#4ADE80,#22D3EE,#8B2FF7,#FF2E93,#FF3D71) border-box;
+  background-size:100% 100%,300% 100%;
+  box-shadow:
+    0 0 0 1px rgba(255,61,113,.66),
+    0 0 9px rgba(255,61,113,.6),
+    0 0 20px rgba(34,211,238,.4),
+    0 0 34px rgba(139,47,247,.32),
+    inset 0 0 12px rgba(255,255,255,.1);
+  animation:k2tRainbow 2.2s linear infinite,k2tNeon 2.6s ease-in-out infinite;
+}
+.k2-top-luori::before{
+  content:"";width:8px;height:8px;border-radius:50%;flex:0 0 auto;
+  background:radial-gradient(circle at 35% 35%,#FFF3B0,#FFD166 42%,#FF8A3D 72%,#FF3D71);
+  box-shadow:0 0 8px #FF8A3D,0 0 16px rgba(255,61,113,.75);
+  animation:k2tSun 2.4s ease-in-out infinite;
+}
+.k2-top-luori::after{
+  content:"";position:absolute;top:0;left:0;width:46%;height:100%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.7),transparent);
+  transform:translateX(-160%);opacity:0;pointer-events:none;
+  animation:k2tSweep 2.4s ease-in-out infinite;
+}
+.k2-top-luori:hover{
+  color:#fff;
+  background:
+    linear-gradient(135deg,rgba(52,26,86,.94),rgba(52,26,86,.94)) padding-box,
+    linear-gradient(90deg,#FF3D71,#FF8A3D,#FFD166,#4ADE80,#22D3EE,#8B2FF7,#FF2E93,#FF3D71) border-box;
+  background-size:100% 100%,300% 100%;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.5),
+    0 0 14px rgba(255,61,113,.82),
+    0 0 30px rgba(34,211,238,.62),
+    0 0 48px rgba(139,47,247,.5),
+    inset 0 0 16px rgba(255,255,255,.2);
+}
+.k2-top-luori:active{transform:translateY(1px);}
+@keyframes k2tRainbow{0%{background-position:0 0,0% 50%;}100%{background-position:0 0,300% 50%;}}
+@keyframes k2tNeon{0%,100%{filter:brightness(1);}50%{filter:brightness(1.28);}}
+@keyframes k2tSun{
+  0%,100%{transform:scale(1);opacity:.9;}
+  50%{transform:scale(1.22);opacity:1;}
+}
+@keyframes k2tSweep{
+  0%{transform:translateX(-160%);opacity:0;}
+  55%{transform:translateX(-160%);opacity:0;}
+  65%{opacity:.85;}
+  88%{transform:translateX(320%);opacity:0;}
+  100%{transform:translateX(320%);opacity:0;}
+}
+@media (prefers-reduced-motion:reduce){
+  .k2-top-luori,.k2-top-luori::before,.k2-top-luori::after{animation:none;}
+}
+`;
+  document.head.appendChild(s);
+}
+
+function makeTopButton() {
+  injectTopBtnCSS();
+  const b = document.createElement("button");
+  b.id = TOP_BTN_ID;
+  b.type = "button";
+  b.className = "k2-top-luori";
+  b.textContent = "落日";
+  b.title = "落日词图库（点击打开）";
+  b.setAttribute("aria-label", "落日词图库");
+  b.addEventListener("pointerdown", (e) => e.stopPropagation());
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (typeof window.__k2GalleryOpen === "function") {
+      try {
+        window.__k2GalleryOpen();
+      } catch (err) {
+        topToast("词图库打开失败");
+      }
+    } else {
+      topToast("先在工作流里放一个 ✨落日-最强-文生图 节点");
+    }
+  });
+  return b;
+}
+
+function attachTopButton() {
+  if (document.getElementById(TOP_BTN_ID)) return true;
+  const lora = (() => {
+    const all = document.querySelectorAll("button");
+    for (const b of all) {
+      const s = (b.getAttribute("aria-label") || "") + " " + (b.title || "");
+      if (/lora\s*manager/i.test(s)) return b;
+    }
+    return null;
+  })();
+  const btn = makeTopButton();
+  if (lora && lora.parentElement) {
+    lora.insertAdjacentElement("afterend", btn);
+    return true;
+  }
+  const bar = document.querySelector('[data-testid="action-bar-buttons"]') ||
+    document.querySelector(".comfyui-menu-right");
+  if (bar) {
+    bar.appendChild(btn);
+    return true;
+  }
+  return false;
+}
+
+function watchTopButton(n) {
+  if (attachTopButton()) return;
+  if (n < 600) requestAnimationFrame(() => watchTopButton(n + 1));
+}
+
+app.registerExtension({
+  name: "krea2sunset.TopGalleryButton",
+  async setup() {
+    watchTopButton(0);
+    try {
+      new MutationObserver(() => { attachTopButton(); }).observe(document.body, { childList: true });
+    } catch (e) { }
+    setInterval(() => { attachTopButton(); }, 5000);
+  },
+});
+
 console.log(`[Krea2Skin] 皮肤脚本已加载 v${SKIN_VERSION} (ComfyUI-Luori-Sunset · 落日提示词 · 霓虹外观)`);
