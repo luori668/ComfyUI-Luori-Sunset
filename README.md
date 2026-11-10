@@ -108,18 +108,6 @@
 - 来自社区整理的公开词库，仅做格式转换与清洗，感谢作者。
 
 ---
- 
-## 节点一览
-
-| 类名（Class） | 显示名 | 作用 |
-|---|---|---|
-| `Krea2PromptPicker` | 落日提示词 | Krea2 提示词抽卡，12 个词库池 |
-| `ZImagePromptGeneratorNode` | ✨ 落日-提示词生成器 | 按分类/模式生成完整提示词 |
-| `ZImagePromptLoaderNode` | ✨ 落日-提示词抽取器 | 超强模式 / 随机模式 / 单分类，三选一 |
-| `ZImageFashionPresetLoaderNode` | 👗 落日-穿搭预设选择器 | 45 套穿搭预设（含「随机」） |
-| `SunsetNSPromptSelector` | 落日提示词选择 | NS 方向提示词选择（正面 / 负面 / 完整） |
-| `SunsetLRPromptBuilder` | 落日提示词预设 | 92 项写真字段 + 预设保存，中英文双语输出 |
-
 
 ## 用法
 
@@ -127,14 +115,6 @@
 2. 节点底部面板点开分组，选分类 / 模式。
 3. 节点输出 `prompt`（STRING）→ 接到 **CLIP Text Encode（CLIP 文本编码器）** 的 `text` 输入。
 4. 连线后正常 Queue Prompt 即可。
-
-
-## 自定义词库
-
-**方式一：加分类**（推荐）
-把符合格式的 `.json` 丢进 `data/zimage/extra/`，重启后即多一个分类。
-格式说明见 `data/zimage/extra/_怎么加分类.txt`。
-
 
 
 ## 兼容性
