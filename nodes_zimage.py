@@ -16,6 +16,10 @@ def _uniq(seq):
     return out
 
 
+def _pack_text(text, seed=0):
+    return {"ui": {"text": [text], "seed": [int(seed)]}, "result": (text,)}
+
+
 BUCKET_RULES = (
     ("情趣", ("情趣", "内衣", "睡裙", "睡衣", "丁字", "开裆", "胸衣", "束身",
               "纯欲", "私房", "漏骨", "乳胶", "透明", "透视", "网衣", "露乳",
@@ -197,20 +201,17 @@ BUCKET_CFG = {
     },
 }
 
-# 自带图案感的颜色 / 材质：二者不能同时出现（"格纹材质 + 印花颜色"会打架）
 PATTERN_COLOR = ("印花", "格纹", "条纹", "波点", "撞色", "拼色", "渐变",
                  "扎染", "鎏金", "描金", "烫银", "晕染")
 PATTERN_MATERIAL = ("格", "纹", "印花", "提花", "织锦", "千鸟", "人字",
                     "3D压花", "褶皱", "亮片", "珠片", "钉珠", "烫钻",
                     "水钻", "羽毛", "立体花", "渐变", "扎染", "刺绣")
 
-# 情趣向丝袜（NSFW 自动补丝袜时优先用这些）
 SEXY_STOCKINGS = ("渔网袜", "网格袜", "菱形网袜", "大网格袜", "细网格袜",
                   "吊带丝袜", "开裆丝袜", "大腿袜", "过膝丝袜", "长筒丝袜",
                   "蕾丝丝袜", "花边丝袜", "亮丝丝袜", "破洞丝袜", "彩色丝袜",
                   "红色丝袜", "黑色丝袜", "分段式丝袜")
 
-# 头部配饰的动词：原逻辑一律写"佩戴XX"，遇到"手表/围巾/项链"就很别扭
 HEADWEAR_VERB_RULES = (
     ("搭配", ("丝巾", "围巾", "披肩", "披帛", "手套", "腰", "包", "链",
               "香囊", "挂件", "工牌", "胸卡", "耳机", "面具", "眼罩",
@@ -241,15 +242,11 @@ FRAMING_RULES = (
 )
 
 
-# 只能在室外成立的天气/天象。promptlib 里那套按"雨天/雪天"整词匹配，
-# 词库扩充后新增的"暴雨/阵雨/落雪/扬沙"等漏掉了，这里按关键词兜住。
 OUTDOOR_WEATHER_KEYS = (
     "雨", "雪", "雾", "霾", "沙", "风", "雷", "雹", "霜", "冰",
     "彩虹", "极光", "银河", "星空", "满月", "日出", "日落", "破晓", "暮色",
 )
 
-# promptlib 的 INDOOR_HINTS 没覆盖词库扩充后新增的场景（"水晶酒柜"之类），
-# 这里在节点内补一层，避免室内场景配上"暴雨/落雪"这种天气。
 INDOOR_HINTS_EXT = (
     "酒柜", "书柜", "柜", "沙龙", "会所", "大堂", "包厢", "套房", "公寓",
     "客房", "试衣间", "更衣室", "化妆间", "壁炉", "剧院", "音乐厅", "拍卖",
@@ -259,7 +256,6 @@ INDOOR_HINTS_EXT = (
     "房", "厅", "馆", "店", "屋", "榻", "床", "镜前", "窗前", "楼梯",
 )
 
-# 各桶不合适的丝袜（给高定/制服这类场合挡掉荧光、破洞、彩色这类）
 STOCKING_BLOCK = {
     "高定": ("荧光", "破洞", "做旧", "磨损", "补丁", "彩色", "红色", "蓝色",
              "紫色", "绿色", "黄色", "橙色", "渐变", "开裆", "吊带", "渔网",
@@ -301,7 +297,6 @@ def _headwear_verb(word):
         for k in keys:
             if k in s:
                 return verb
-    # 兜底用"搭配"：比一律"佩戴"自然，"佩戴手表/佩戴勋章"读着别扭
     return "搭配"
 
 
@@ -355,9 +350,17 @@ class ZImagePromptGeneratorNode:
         sexy = libs.get("情趣服装", {})
         framing = libs.get("景别", {})
 
-        def L(group, sub, fallback=None):
+        def L(group, sub, fallback=None, tail=()):
             v = group.get(sub)
-            return list(v) if isinstance(v, list) and v else (fallback or ["无"])
+            base = list(v) if isinstance(v, list) and v else (fallback or ["无"])
+            out = []
+            seen = set()
+            for x in list(base) + list(tail):
+                if x in seen:
+                    continue
+                seen.add(x)
+                out.append(x)
+            return out
 
         age_options = ["无"] + ["{}岁".format(i) for i in range(16, 39)]
         body_options = ["无", "苗条修长", "S型火辣曲线", "丰满坚挺", "纤细腰肢蜜桃臀",
@@ -373,9 +376,9 @@ class ZImagePromptGeneratorNode:
             "required": {
                 "风格主题": (list(style_tpl.keys()) + ["随机", "无"],
                              {"default": "高冷御姐", "hidden": True}),
-                "拍摄风格": (L(styles, "风格") + ["随机", "无"],
+                "拍摄风格": (L(styles, "风格", None, ("随机", "无")),
                              {"default": "时尚艺术写真", "hidden": True}),
-                "拍摄类型": (L(styles, "类型") + ["随机", "无"],
+                "拍摄类型": (L(styles, "类型", None, ("随机", "无")),
                              {"default": "小香风", "hidden": True}),
                 "细节级别": (["简洁级", "普通级", "详细级", "大师级", "极致级", "无"],
                              {"default": "大师级", "hidden": True}),
@@ -386,9 +389,9 @@ class ZImagePromptGeneratorNode:
                          {"default": "无", "hidden": True}),
                 "年龄": (age_options, {"default": "23岁", "hidden": True}),
                 "身材": (body_options, {"default": "舞蹈生紧致身材", "hidden": True}),
-                "种族选择": (L(race, "人种") + ["随机", "无"],
+                "种族选择": (L(race, "人种", None, ("随机", "无")),
                              {"default": "亚洲人", "hidden": True}),
-                "美瞳选择": (L(lens, "美瞳") + ["随机"],
+                "美瞳选择": (L(lens, "美瞳", None, ("随机",)),
                              {"default": "蓝灰色", "hidden": True}),
                 "丝袜类型": (L(stocking, "丝袜种类"), {"default": "无", "hidden": True}),
                 "头部配饰": (all_headwear, {"default": "无", "hidden": True}),
@@ -451,7 +454,6 @@ class ZImagePromptGeneratorNode:
 
         def resolve(value, group, sub):
             if value == "随机":
-                # 排除占位项，否则会真的生成"穿着随机，""景别：随机"这种句子
                 p = [x for x in (libs.get(group, {}).get(sub) or [])
                      if x not in ("无", "随机", "")]
                 return rng.choice(p) if p else ""
@@ -512,7 +514,6 @@ class ZImagePromptGeneratorNode:
         }
 
 
-    # 戴帽子时不宜同时出现的发型（丸子头/高马尾上面再扣顶帽子会很怪）
     HAIR_BLOCK_WITH_HAT = ("丸子头", "高马尾", "双马尾", "公主头", "花苞头",
                            "盘发", "低盘发", "发髻", "编发", "麻花辫",
                            "拳击辫", "蜈蚣辫", "丝带编发", "盘发插梳",
@@ -542,10 +543,6 @@ class ZImagePromptGeneratorNode:
         def is_on(v):
             return bool(v) and v != "无"
 
-        # --------------------------------------------------------------
-        # 1) 定风格桶：情趣衣服 > NSFW > 拍摄类型 > 拍摄风格
-        #    桶一旦定下，服装/材质/颜色/丝袜/鞋子/头饰/场景全部跟着它走
-        # --------------------------------------------------------------
         sexy_on = is_on(sexy_clothing)
         if nsfw and not sexy_on:
             cand = [x for x in pool("情趣服装", "情趣衣服")
@@ -560,37 +557,24 @@ class ZImagePromptGeneratorNode:
             bucket = (_bucket_of(type_val) or _bucket_of(style) or "通用")
         cfg = BUCKET_CFG.get(bucket, BUCKET_CFG["通用"])
 
-        # 情趣桶下，如果「拍摄类型」还指向别的风格（比如古装/制服），
-        # 就换成私房——否则开头写"古装"、身上是情趣内衣，前后打架。
         if bucket == "情趣" and type_val:
             tb = _bucket_of(type_val)
             if tb and tb != "情趣":
                 type_val = cfg.get("type_override") or "私房"
 
-        # --------------------------------------------------------------
-        # 2) 头部配饰：用户显式选的尊重；选"随机"时按桶抽
-        # --------------------------------------------------------------
         if headwear == "随机":
             headwear = pick(*cfg["headwear"]) or pick("头部配饰", "头饰")
         headwear_on = is_on(headwear)
         headwear_verb = _headwear_verb(headwear) if headwear_on else ""
 
-        # --------------------------------------------------------------
-        # 3) 鞋子：用户显式选的尊重；选"随机"时按桶抽
-        # --------------------------------------------------------------
         if shoes == "随机":
             shoes = pick(*cfg["shoes"]) or pick("鞋子类型", "鞋类")
         elif cfg.get("force_shoes") and is_on(shoes):
-            # 情趣/古风这类强风格桶：用户选的鞋若不在这个桶的鞋池里就换掉，
-            # 免得出现"情趣内衣 + 劳保鞋""汉服 + 篮球鞋"这种组合
             allowed = set(pool(*cfg["shoes"]))
             if allowed and shoes not in allowed:
                 shoes = rng.choice(sorted(allowed))
         shoes_on = is_on(shoes)
 
-        # --------------------------------------------------------------
-        # 4) 人物
-        # --------------------------------------------------------------
         age_str = "{}的".format(selected_age) if selected_age != "无" else ""
         body_str = "{}，".format(selected_body) if selected_body != "无" else ""
 
@@ -609,14 +593,10 @@ class ZImagePromptGeneratorNode:
                     break
                 hair = pick("模特设定", "发型发色")
 
-        # --------------------------------------------------------------
-        # 5) 主服装：全场只有一套。情趣衣服与常规服装二选一，情趣优先。
-        # --------------------------------------------------------------
         garment = ""
         material = ""
         color = ""
         if sexy_on:
-            # 情趣衣服自带完整描述，不再叠材质/颜色，也不再叠常规服装
             outfit = "穿着{}，".format(sexy_clothing)
         else:
             garment = pick_multi(cfg["garment"]) or pick_multi(
@@ -643,9 +623,6 @@ class ZImagePromptGeneratorNode:
                 color = rng.choice(cpool) if cpool else ""
             outfit = "身着{}{}{}，".format(color, material, garment) if garment else ""
 
-        # --------------------------------------------------------------
-        # 6) 丝袜：与服装重复就不再叠加（情趣衣服自带袜、长裤等）
-        # --------------------------------------------------------------
         lower_cloth = str(sexy_clothing or "") + str(garment)
         has_legwear = any(k in lower_cloth for k in
                           ("丝袜", "网袜", "袜", "裤", "连体", "裙裤"))
@@ -664,9 +641,6 @@ class ZImagePromptGeneratorNode:
         if is_on(stocking):
             outfit += "搭配{}，".format(stocking)
 
-        # --------------------------------------------------------------
-        # 7) 场景 / 天气：按桶取场景，时间天气再做室内外过滤
-        # --------------------------------------------------------------
         scene = pick_multi(cfg["scene"])
         if not scene:
             scene = pick("场景环境", rng.choice(["室内场景", "室外场景"]))
@@ -686,9 +660,6 @@ class ZImagePromptGeneratorNode:
         time_weather = PL.pick_compatible(weather_pool, weather_ok, rng)
         scene_phrase = self._scene_phrase(time_weather, scene, atmosphere)
 
-        # --------------------------------------------------------------
-        # 8) 镜头 / 构图 / 光线 / 色调
-        # --------------------------------------------------------------
         lens = pick("拍摄参数", "镜头")
         composition = pick("构图光影", "构图")
         depth = pick("构图光影", "景深")
@@ -699,9 +670,6 @@ class ZImagePromptGeneratorNode:
         expression = coherent["表情"]
         eyes = coherent["眼神"]
 
-        # --------------------------------------------------------------
-        # 9) 姿势：NSFW 走性感姿势池，否则走全身姿势池
-        # --------------------------------------------------------------
         if is_on(action):
             pose = action
         elif nsfw:
@@ -711,9 +679,6 @@ class ZImagePromptGeneratorNode:
 
         nsfw_body = pick("NSFW元素", "身体强调") if nsfw else ""
 
-        # --------------------------------------------------------------
-        # 10) 拼装
-        # --------------------------------------------------------------
         parts = []
         if style:
             parts.append(style)
@@ -736,7 +701,6 @@ class ZImagePromptGeneratorNode:
             parts.append(outfit)
         if headwear_on:
             verb = headwear_verb
-            # 丝袜已经用过"搭配"了，头饰换个说法，避免一句话里两个"搭配"
             if verb == "搭配" and "搭配" in outfit:
                 verb = "另有"
             parts.append("{}{}，".format(verb, headwear))
@@ -772,7 +736,6 @@ class ZImagePromptGeneratorNode:
                                      " --ar 2:3 --style raw"]))
 
         text = "".join(parts).strip("，").strip()
-        # 关掉后缀参数时最后一句已经带句号了，再补一个会变成"。。"
         if not text.endswith(("。", "！", "!", ".", "；", ";")):
             text += "。"
         return text
@@ -785,7 +748,6 @@ class ZImagePromptGeneratorNode:
                 "雪天": "窗外飘着雪", "雾天": "窗外起了薄雾", "彩虹天": "窗外天边挂着彩虹",
                 "台风天": "窗外风雨交加", "雷雨天": "窗外雷雨交加",
                 "沙尘天": "窗外沙尘漫天", "极光夜": "窗外夜空泛着极光"}.get(w)
-        # 室内场景配天气词会变成"置身于暴雨水晶酒柜"，这里直接丢掉天气
         if w and _looks_indoor(s) and _is_outdoor_weather(w):
             return "置身于{}，氛围{}。".format(s, atmosphere)
         if verb and _looks_indoor(s):
@@ -850,7 +812,9 @@ class ZImagePromptLoaderNode:
         return PL.find_file("zimage", fn or "prompt_library.json")
 
     def load_prompt(self, **kw):
-        rng = random.Random(kw.get("seed", 0) or None)
+        raw_seed = int(kw.get("seed", 0) or 0)
+        used_seed = raw_seed if raw_seed else random.SystemRandom().randrange(1, 0xFFFFFFFF)
+        rng = random.Random(used_seed)
         trigger_on = kw.get("触发词开关", False)
         trigger_tx = str(kw.get("触发词内容", "") or "").strip()
 
@@ -859,11 +823,14 @@ class ZImagePromptLoaderNode:
                 return trigger_tx + " " + text
             return text
 
+        def pack(text):
+            return _pack_text(finish(text), used_seed)
+
         if kw.get("超强模式", True):
             sup = PL.load_super()
             if not sup:
-                return (finish("超强词库没有加载成功：请确认 data\\shared\\luori.json 存在"),)
-            return (finish(rng.choice(sup)),)
+                return pack("超强词库没有加载成功：请确认 data\\shared\\luori.json 存在")
+            return pack(rng.choice(sup))
 
         cats, _stats = PL.load_zimage_categories()
         for k, v in PL.load_extra_categories().items():
@@ -872,15 +839,15 @@ class ZImagePromptLoaderNode:
         p = self._resolve_library(kw.get("文件路径"))
         data = PL.load_json(p)
         if data is None and not cats:
-            return (finish("词库不存在！请确认插件目录 data\\zimage\\prompt_library.json"),)
+            return pack("词库不存在！请确认插件目录 data\\zimage\\prompt_library.json")
 
         if kw.get("随机模式", False):
             allp = []
             for v in cats.values():
                 allp.extend(v)
             if not allp:
-                return (finish("JSON中没有提示词"),)
-            return (finish(rng.choice(allp)),)
+                return pack("JSON中没有提示词")
+            return pack(rng.choice(allp))
 
         selected = []
         for name, pool in cats.items():
@@ -888,8 +855,8 @@ class ZImagePromptLoaderNode:
                 selected.extend(pool)
 
         if not selected:
-            return (finish("请至少开启一个分类开关，或打开随机模式"),)
-        return (finish(rng.choice(selected)),)
+            return pack("请至少开启一个分类开关，或打开随机模式")
+        return pack(rng.choice(selected))
 
 
 
