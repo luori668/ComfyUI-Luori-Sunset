@@ -62,6 +62,26 @@ def _pool_from_dir(ext, filename):
     return PL.load_cleaned(os.path.join(ext, filename))
 
 
+SAVER_HINTS = ("SaveImage", "SaveAnimatedWEBP", "SaveAnimatedPNG")
+
+
+def count_savers():
+    try:
+        from server import PromptServer
+        running = PromptServer.instance.prompt_queue.get_current_queue()[0]
+        if not running:
+            return 0, []
+        prompt = running[0][2] or {}
+    except Exception:
+        return 0, []
+    hits = []
+    for node_id, node in prompt.items():
+        ctype = str((node or {}).get("class_type") or "")
+        if any(key in ctype for key in SAVER_HINTS):
+            hits.append((str(node_id), ctype))
+    return len(hits), hits
+
+
 
 class Krea2PromptPicker:
 
@@ -96,6 +116,7 @@ class Krea2PromptPicker:
             "KOOK词库": ("BOOLEAN", {"default": False, "hidden": True}),
             "SFW词库": ("BOOLEAN", {"default": False, "hidden": True}),
             "19+词库": ("BOOLEAN", {"default": False, "hidden": True}),
+            "严格单图": ("BOOLEAN", {"default": True, "hidden": True}),
             "使用提示": ("STRING", {
                 "default": "提示：开关互斥，多开无效（包括中文模式）此处勿动。",
                 "multiline": True,
@@ -120,6 +141,14 @@ class Krea2PromptPicker:
     def pick(self, prompt_dir, seed, mode, separator, **kw):
         used_seed = int(seed) if seed else random.SystemRandom().randrange(1, 0xFFFFFFFFFFFFFFFF)
         rng = random.Random(used_seed)
+        if kw.get("严格单图", True):
+            total, hits = count_savers()
+            if total > 1:
+                names = "、".join("%s(%s)" % (node_id, ctype) for node_id, ctype in hits)
+                raise RuntimeError(
+                    "检测到 %d 个 SaveImage：%s。严格单图已开启，请只保留一个，"
+                    "或在「高级参数」里关闭「严格单图」。" % (total, names)
+                )
         ext = _external_dir(prompt_dir)
 
         active_pools = []
