@@ -875,7 +875,11 @@ function injectCSS() {
 .k2g-mask.on{opacity:1;}
 .k2g-win{position:relative;width:min(1600px,98vw);height:min(1020px,95vh);display:flex;flex-direction:column;border-radius:16px;
   overflow:hidden;transform:translateY(12px);transition:transform .18s cubic-bezier(.22,1,.36,1);
-  background:linear-gradient(180deg,var(--bg1,#191134),var(--bg2,#100B1F));border:1px solid rgba(255,255,255,.1);
+  background:
+    radial-gradient(60% 46% at 10% 0%, var(--g1,#191134), transparent 62%),
+    radial-gradient(56% 44% at 92% 100%, var(--g1,#191134), transparent 60%),
+    linear-gradient(180deg,var(--bg1,#191134),var(--bg2,#100B1F));
+  border:1px solid rgba(255,255,255,.1);
   box-shadow:0 30px 90px rgba(0,0,0,.72),inset 0 1px 0 rgba(255,255,255,.08);color:#EDE9FE;
   font:12px/1.45 "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
 .k2g-mask.on .k2g-win{transform:translateY(0);}
@@ -910,7 +914,11 @@ function injectCSS() {
   background:rgba(255,255,255,.05);color:#EDE9FE;font:11px/1 inherit;cursor:pointer;transition:all .12s;}
 .k2g-act:hover{border-color:var(--o,#FF8A3D);box-shadow:0 0 12px rgba(255,138,61,.18);}
 .k2g-grid{flex:1;overflow:auto;padding:16px 18px 22px;display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;align-content:start;}
+  grid-template-columns:repeat(auto-fill,var(--k2g-card-w,240px));justify-content:start;gap:16px;align-content:start;}
+.k2g-grid.k2g-compact{--k2g-card-w:164px;gap:12px;}
+@media (max-width:760px){
+  .k2g-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
+}
 .k2g-card{position:relative;display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:rgba(255,255,255,.035);
   border:1px solid rgba(255,255,255,.09);transition:transform .14s ease,border-color .14s,box-shadow .14s;}
 .k2g-card::before{content:"";position:absolute;inset:0;border-radius:12px;padding:1px;pointer-events:none;z-index:2;
@@ -918,9 +926,12 @@ function injectCSS() {
   background-size:300% 100%;
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
   -webkit-mask-composite:xor;mask-composite:exclude;
-  opacity:.55;transition:opacity .16s;}
+  opacity:.72;
+  animation:k2gFlow 7s linear infinite;
+  animation-delay:calc(var(--i,0) * -0.42s);
+  transition:opacity .16s;}
 .k2g-card:hover{transform:translateY(-2px);border-color:transparent;box-shadow:0 12px 30px rgba(0,0,0,.55),0 0 18px rgba(139,92,246,.32);}
-.k2g-card:hover::before{opacity:1;animation:k2gFlow 2.6s linear infinite;}
+.k2g-card:hover::before{opacity:1;animation-duration:2.2s;animation-delay:0s;}
 @keyframes k2gFlow{0%{background-position:0% 50%;}100%{background-position:300% 50%;}}
 .k2g-skin{position:absolute;right:16px;bottom:46px;z-index:7;}
 .k2g-skin-btn{height:30px;padding:0 14px;border-radius:99px;cursor:pointer;display:inline-flex;
@@ -965,10 +976,44 @@ function injectCSS() {
 .k2g-empty{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
   padding:70px 0;color:#6B6191;}
 .k2g-ei{font-size:34px;opacity:.5;}
-.k2g-foot{display:flex;align-items:center;gap:10px;padding:9px 18px;border-top:1px solid rgba(255,255,255,.07);
+.k2g-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 18px;border-top:1px solid rgba(255,255,255,.07);
   font-size:11px;color:#7F75A8;}
+.k2g-fhint{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.k2g-pager{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
+.k2g-pg{width:24px;height:22px;border-radius:6px;cursor:pointer;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.05);color:#CFC7EA;font:14px/1 inherit;padding:0;}
+.k2g-pg:hover:not(:disabled){border-color:rgba(255,255,255,.4);color:#fff;}
+.k2g-pg:disabled{opacity:.3;cursor:default;}
+.k2g-pinfo{font-size:11px;color:#9A90C4;font-variant-numeric:tabular-nums;min-width:54px;text-align:center;}
+.k2g-day{grid-column:1/-1;display:flex;align-items:center;gap:10px;margin:8px 0 2px;
+  font:600 11px/1 inherit;color:#8E85B8;letter-spacing:.5px;}
+.k2g-day>i{flex:1;height:1px;background:linear-gradient(90deg,rgba(139,92,246,.45),transparent);}
+.k2g-pick{position:absolute;left:8px;top:8px;z-index:3;width:22px;height:22px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
+  border:1px solid rgba(255,255,255,.42);background:rgba(10,6,20,.55);color:#fff;
+  font:700 12px/1 inherit;opacity:0;transition:opacity .14s,background .14s;backdrop-filter:blur(4px);}
+.k2g-card:hover .k2g-pick{opacity:1;}
+.k2g-pick.on{opacity:1;background:#8B5CF6;border-color:#C4B5FD;box-shadow:0 0 10px rgba(139,92,246,.8);}
+.k2g-selbar{position:absolute;left:50%;bottom:44px;transform:translateX(-50%) translateY(8px);
+  display:none;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;z-index:8;
+  background:rgba(20,12,38,.96);border:1px solid rgba(139,92,246,.45);
+  box-shadow:0 14px 38px rgba(0,0,0,.7),0 0 20px rgba(139,92,246,.28);
+  backdrop-filter:blur(12px);opacity:0;transition:opacity .16s,transform .16s;}
+.k2g-selbar.on{display:flex;opacity:1;transform:translateX(-50%) translateY(0);}
+.k2g-selc{font-size:11px;color:#DDD5F5;white-space:nowrap;padding-right:2px;}
+.k2g-selbar>button{height:26px;padding:0 12px;border-radius:99px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);
+  color:#D9D2F0;font:11px/1 inherit;transition:all .12s;white-space:nowrap;}
+.k2g-selbar>button:hover{border-color:rgba(255,255,255,.4);color:#fff;}
+.k2g-selbar>button.dg{color:#FF9AA8;border-color:rgba(255,61,113,.42);background:rgba(255,61,113,.12);}
+.k2g-selbar>button.dg:hover{background:rgba(255,61,113,.24);color:#fff;}
+.k2g-grid.k2g-compact .k2g-body,
+.k2g-grid.k2g-compact .k2g-acts{display:none;}
+.k2g-grid.k2g-compact .k2g-card{border-radius:10px;}
 .k2g-full{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:24px;
   background:rgba(4,2,10,.88);backdrop-filter:blur(4px);}
+.k2g-full-ph{display:flex;flex-direction:column;align-items:center;gap:10px;color:#9A90C4;font-size:12px;}
+.k2g-full-i{font-size:40px;opacity:.55;}
 .k2g-full img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.7);}
 .k2g-full .k2g-x{position:absolute;top:16px;right:18px;}
 .k2g-conf{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;
@@ -1611,6 +1656,10 @@ function buildPanel(node) {
   let gallerySrc = "";
   let galleryStar = false;
   let gallerySort = "new";
+  let galleryPage = 1;
+  let gallerySel = new Set();
+  let galleryCompact = false;
+  const GALLERY_PAGE_SIZE = 60;
 
   const closeGallery = () => {
     if (!galleryMask) return;
@@ -1693,7 +1742,7 @@ function buildPanel(node) {
     const search = el("input", "k2g-search");
     search.placeholder = "搜索提示词 / 种子 / 来源";
     search.spellcheck = false;
-    search.oninput = () => { galleryQ = search.value.trim().toLowerCase(); render(); };
+    search.oninput = () => { galleryQ = search.value.trim().toLowerCase(); galleryPage = 1; render(); };
     const btnX = el("button", "k2g-x", "×");
     btnX.type = "button";
     btnX.onclick = closeGallery;
@@ -1715,6 +1764,7 @@ function buildPanel(node) {
       chip.type = "button";
       chip.onclick = () => {
         gallerySrc = value;
+        galleryPage = 1;
         for (const c of srcChips) c.classList.toggle("on", c.dataset.v === value);
         render();
       };
@@ -1724,7 +1774,7 @@ function buildPanel(node) {
     }
     const chipStar = el("button", "k2g-chip", "★ 收藏");
     chipStar.type = "button";
-    chipStar.onclick = () => { galleryStar = !galleryStar; chipStar.classList.toggle("on", galleryStar); render(); };
+    chipStar.onclick = () => { galleryStar = !galleryStar; chipStar.classList.toggle("on", galleryStar); galleryPage = 1; render(); };
     const addSrcChip = (value) => {
       if (!value || knownSrc.has(value)) return;
       knownSrc.add(value);
@@ -1733,6 +1783,7 @@ function buildPanel(node) {
       chip.dataset.v = value;
       chip.onclick = () => {
         gallerySrc = value;
+        galleryPage = 1;
         for (const c of srcChips) c.classList.toggle("on", c.dataset.v === value);
         render();
       };
@@ -1753,13 +1804,114 @@ function buildPanel(node) {
         if (v === gallerySort) op.selected = true;
         sortSel.appendChild(op);
       });
-    sortSel.onchange = () => { gallerySort = sortSel.value; render(); };
-    tools.append(chipStar, sortSel, spacer, btnAdd);
+    sortSel.onchange = () => { gallerySort = sortSel.value; galleryPage = 1; render(); };
+    const btnCompact = el("button", "k2g-act", "紧凑");
+    btnCompact.type = "button";
+    btnCompact.title = "切换紧凑显示（一行放更多）";
+    btnCompact.onclick = () => {
+      galleryCompact = !galleryCompact;
+      btnCompact.classList.toggle("on", galleryCompact);
+      grid.classList.toggle("k2g-compact", galleryCompact);
+    };
+    tools.append(chipStar, sortSel, spacer, btnAdd, btnCompact);
 
     const grid = el("div", "k2g-grid");
-    const foot = el("div", "k2g-foot", "点缩略图看大图 · 双击提示词复制全文 · Esc 关闭");
+    const foot = el("div", "k2g-foot");
+    foot.appendChild(el("span", "k2g-fhint", "点缩略图看大图 · 双击提示词复制全文 · Esc 关闭"));
+    const pager = el("div", "k2g-pager");
+    const bPrev = el("button", "k2g-pg", "‹");
+    const bNext = el("button", "k2g-pg", "›");
+    const pgInfo = el("span", "k2g-pinfo", "1 / 1");
+    bPrev.type = bNext.type = "button";
+    bPrev.title = "上一页";
+    bNext.title = "下一页";
+    bPrev.onclick = () => { if (galleryPage > 1) { galleryPage -= 1; render(); grid.scrollTop = 0; } };
+    bNext.onclick = () => { galleryPage += 1; render(); grid.scrollTop = 0; };
+    pager.append(bPrev, pgInfo, bNext);
+    foot.appendChild(pager);
 
-    win.append(head, warn, tools, grid, foot);
+    const paintPager = (total, pages, from) => {
+      bPrev.disabled = galleryPage <= 1;
+      bNext.disabled = galleryPage >= pages;
+      if (pages > 1) {
+        pgInfo.textContent = galleryPage + " / " + pages;
+      } else {
+        pgInfo.textContent = total ? total + " 条" : "0 条";
+      }
+    };
+
+    const selBar = el("div", "k2g-selbar");
+    const selCount = el("span", "k2g-selc", "已选 0 条");
+    const bAll = el("button", null, "全选本页");
+    const bStarAll = el("button", null, "收藏");
+    const bCopyAll = el("button", null, "复制");
+    const bDelAll = el("button", "dg", "删除");
+    const bClear = el("button", null, "取消");
+    bAll.type = bStarAll.type = bCopyAll.type = bDelAll.type = bClear.type = "button";
+    selBar.append(selCount, bAll, bStarAll, bCopyAll, bDelAll, bClear);
+
+    const paintSelBar = () => {
+      const n = gallerySel.size;
+      selCount.textContent = "已选 " + n + " 条";
+      selBar.classList.toggle("on", n > 0);
+    };
+
+    const pageIds = () => Array.from(grid.querySelectorAll(".k2g-card"))
+      .map((c) => c.dataset.id)
+      .filter(Boolean);
+
+    bAll.onclick = () => {
+      const ids = pageIds();
+      if (!ids.length) return;
+      const allIn = ids.every((id) => gallerySel.has(id));
+      if (allIn) {
+        for (const id of ids) gallerySel.delete(id);
+      } else {
+        for (const id of ids) gallerySel.add(id);
+      }
+      render();
+    };
+
+    bStarAll.onclick = async () => {
+      const ids = Array.from(gallerySel);
+      if (!ids.length) return;
+      bStarAll.disabled = true;
+      for (const id of ids) {
+        try {
+          await gReq("/luori/k2/gallery/star", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, star: true }),
+          });
+          const it = galleryItems.find((x) => x.id === id);
+          if (it) it.star = true;
+        } catch (e) { }
+      }
+      bStarAll.disabled = false;
+      render();
+    };
+
+    bCopyAll.onclick = async () => {
+      const lines = [];
+      for (const id of gallerySel) {
+        const it = galleryItems.find((x) => x.id === id);
+        if (it && it.prompt) lines.push(it.prompt);
+      }
+      if (!lines.length) return;
+      await gCopy(lines.join("\n"), bCopyAll);
+    };
+
+    bDelAll.onclick = () => {
+      const ids = Array.from(gallerySel);
+      if (ids.length) askDeleteMany(ids);
+    };
+
+    bClear.onclick = () => {
+      gallerySel.clear();
+      render();
+    };
+
+    win.append(head, warn, tools, grid, selBar, foot);
 
     const skinWrap = el("div", "k2g-skin");
     const skinBtn = el("button", "k2g-skin-btn");
@@ -1794,8 +1946,10 @@ function buildPanel(node) {
       if (!skinWrap.contains(ev.target)) skinPop.classList.remove("on");
     });
 
-    const updateCount = (total, limit, warnAt) => {
-      countEl.textContent = total + " / " + limit;
+    const updateCount = (total, limit, warnAt, bytes) => {
+      const b = Number(bytes) || 0;
+      const size = b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.round(b / 1024) + " KB";
+      countEl.textContent = total + " / " + limit + " · " + size;
       barFill.style.width = Math.min(100, (total / limit) * 100) + "%";
       if (total >= warnAt) {
         warn.classList.add("on");
@@ -1811,8 +1965,14 @@ function buildPanel(node) {
       if (win.querySelector(".k2g-full")) return;
       const full = el("div", "k2g-full");
       const img = el("img");
-      img.src = api.apiURL("/luori/k2/gallery/image/" + encodeURIComponent(item.id));
       img.alt = item.prompt || "";
+      img.onerror = () => {
+        try { img.remove(); } catch (e) { }
+        const ph = el("div", "k2g-full-ph");
+        ph.append(el("div", "k2g-full-i", "🖼"), el("div", null, "原图已丢失（output 里的文件被清理了）"));
+        full.insertBefore(ph, full.firstChild);
+      };
+      img.src = api.apiURL("/luori/k2/gallery/image/" + encodeURIComponent(item.id));
       const close = el("button", "k2g-x", "×");
       close.type = "button";
       close.onclick = () => full.remove();
@@ -1852,6 +2012,42 @@ function buildPanel(node) {
         } catch (e) { purge.textContent = "删除失败"; purge.disabled = false; }
       };
       bar2.append(cancel, keep, purge);
+      box.append(title, desc, note, bar2);
+      conf.appendChild(box);
+      conf.addEventListener("click", (ev) => { if (ev.target === conf) conf.remove(); });
+      win.appendChild(conf);
+    };
+
+    const askDeleteMany = (ids) => {
+      const old = win.querySelector(".k2g-conf");
+      if (old) old.remove();
+      const conf = el("div", "k2g-conf");
+      const box = el("div", "k2g-cbox");
+      const title = el("div", "k2g-ct", "删除选中的 " + ids.length + " 条？");
+      const desc = el("p", "k2g-cp", "提示词和缩略图会一起删除，此操作不可恢复。");
+      const note = el("div", "k2g-cw", "只删存档，不动 output 里的原图。");
+      const bar2 = el("div", "k2g-cb");
+      const cancel = el("button", "k2g-btn", "取消");
+      const go = el("button", "k2g-btn dg", "确认删除");
+      cancel.type = go.type = "button";
+      cancel.onclick = () => conf.remove();
+      go.onclick = async () => {
+        go.disabled = true;
+        go.textContent = "删除中…";
+        let ok = 0;
+        for (const id of ids) {
+          try {
+            await gReq("/luori/k2/gallery/" + encodeURIComponent(id) + "?mode=keep", { method: "DELETE" });
+            galleryItems = galleryItems.filter((x) => x.id !== id);
+            gallerySel.delete(id);
+            ok += 1;
+          } catch (e) { }
+        }
+        go.textContent = "已删 " + ok + " 条";
+        conf.remove();
+        render();
+      };
+      bar2.append(cancel, go);
       box.append(title, desc, note, bar2);
       conf.appendChild(box);
       conf.addEventListener("click", (ev) => { if (ev.target === conf) conf.remove(); });
@@ -1907,6 +2103,17 @@ function buildPanel(node) {
       return v === "超强" || v === "分类" ? "文生图" : v;
     };
 
+    const dayLabel = (d) => {
+      const pad = (n) => String(n).padStart(2, "0");
+      const now = new Date();
+      const y = new Date(now.getTime() - 86400000);
+      const today = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate());
+      const yest = y.getFullYear() + "-" + pad(y.getMonth() + 1) + "-" + pad(y.getDate());
+      if (d === today) return "今天";
+      if (d === yest) return "昨天";
+      return d;
+    };
+
     const render = () => {
       for (const it of galleryItems) addSrcChip(srcKey(it.source));
       const list = galleryItems.filter((it) => {
@@ -1931,15 +2138,38 @@ function buildPanel(node) {
         if (gallerySort === "seedDesc") return (Number(b.seed) || 0) - (Number(a.seed) || 0);
         return byTime(b, a);
       });
+
+      const total = list.length;
+      const pages = Math.max(1, Math.ceil(total / GALLERY_PAGE_SIZE));
+      if (galleryPage > pages) galleryPage = pages;
+      if (galleryPage < 1) galleryPage = 1;
+      const from = (galleryPage - 1) * GALLERY_PAGE_SIZE;
+      const pageList = list.slice(from, from + GALLERY_PAGE_SIZE);
+
       grid.replaceChildren();
-      if (!list.length) {
+      if (!total) {
         const empty = el("div", "k2g-empty");
         empty.append(el("div", "k2g-ei", "🗂"), el("div", null, galleryItems.length ? "没有匹配的记录" : "还没有存档，跑一次就有了"));
         grid.appendChild(empty);
+        paintPager(0, 1, 0);
+        paintSelBar();
         return;
       }
-      for (const it of list) {
+
+      const grouped = gallerySort === "new" || gallerySort === "old";
+      let lastDay = "";
+      pageList.forEach((it, idx) => {
+        const day = String(it.created || "").slice(0, 10);
+        if (grouped && day && day !== lastDay) {
+          lastDay = day;
+          const sep = el("div", "k2g-day");
+          sep.appendChild(el("span", null, dayLabel(day)));
+          sep.appendChild(el("i"));
+          grid.appendChild(sep);
+        }
         const card = el("article", "k2g-card");
+        card.dataset.id = it.id;
+        card.style.setProperty("--i", String(idx));
         const thumb = el("div", "k2g-thumb");
         if (it.has_image) {
           const img = el("img");
@@ -1947,7 +2177,11 @@ function buildPanel(node) {
           img.decoding = "async";
           img.src = api.apiURL("/luori/k2/gallery/thumb/" + encodeURIComponent(it.id));
           img.alt = it.prompt || "";
-          img.onerror = () => { thumb.classList.add("none"); thumb.textContent = "图已丢失"; };
+          img.onerror = () => {
+            try { img.remove(); } catch (e) { }
+            thumb.classList.add("none");
+            thumb.textContent = "缩略图已丢失";
+          };
           img.onclick = () => showFull(it);
           thumb.appendChild(img);
         } else {
@@ -1977,6 +2211,21 @@ function buildPanel(node) {
         };
         thumb.appendChild(star);
 
+        const picked = gallerySel.has(it.id);
+        const pick = el("button", "k2g-pick" + (picked ? " on" : ""), picked ? "✓" : "");
+        pick.type = "button";
+        pick.title = "选中 / 取消";
+        pick.onclick = (ev) => {
+          ev.stopPropagation();
+          if (gallerySel.has(it.id)) gallerySel.delete(it.id);
+          else gallerySel.add(it.id);
+          const on = gallerySel.has(it.id);
+          pick.classList.toggle("on", on);
+          pick.textContent = on ? "✓" : "";
+          paintSelBar();
+        };
+        thumb.appendChild(pick);
+
         const body = el("div", "k2g-body");
         const txt = el("p", "k2g-txt", it.prompt || "");
         txt.title = it.prompt || "";
@@ -2000,14 +2249,17 @@ function buildPanel(node) {
 
         card.append(thumb, body, acts);
         grid.appendChild(card);
-      }
+      });
+
+      paintPager(total, pages, from);
+      paintSelBar();
     };
 
     const load = async () => {
       try {
         const data = await gReq("/luori/k2/gallery");
         galleryItems = Array.isArray(data.items) ? data.items : [];
-        updateCount(data.total ?? galleryItems.length, data.limit ?? 1000, data.warn ?? 950);
+        updateCount(data.total ?? galleryItems.length, data.limit ?? 1000, data.warn ?? 950, data.bytes ?? 0);
         render();
       } catch (e) {
         countEl.textContent = "读取失败";
