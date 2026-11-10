@@ -1,4 +1,5 @@
 import { app } from "../../scripts/app.js";
+import { api } from "../../scripts/api.js";
 
 const SKIN_VERSION = "1.1.1";
 
@@ -161,6 +162,122 @@ const THEME = {
   tx: "#EDE9FE", dim: "#9A90C4", ln: "rgba(255,255,255,.09)",
 };
 
+let zsActx = null;
+let zsSfxOn = true;
+try { zsSfxOn = localStorage.getItem("zs_sfx") !== "0"; } catch (e) { }
+const zsTone = (c, freq, t0, dur, type, vol) => {
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain);
+  gain.connect(c.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.03);
+};
+const zsAudio = () => {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    zsActx = zsActx || new AC();
+    if (zsActx.state === "suspended" && zsActx.resume) zsActx.resume();
+    return zsActx;
+  } catch (e) { return null; }
+};
+const zsBlip = (kind) => {
+  const shared = window.__k2Shared;
+  if (shared && typeof shared.sfxForce === "function") {
+    try { shared.sfxForce(kind); return; } catch (e) { }
+  }
+  try {
+    const c = zsAudio();
+    if (!c) return;
+    const t = c.currentTime + 0.005;
+    zsTone(c, kind === "off" ? 320 : 520, t, 0.09, "sine", 0.05);
+  } catch (e) { }
+};
+const zsBeep = () => {
+  if (!zsSfxOn) return;
+  const shared = window.__k2Shared;
+  if (shared) {
+    if (typeof shared.sfxForce === "function") {
+      try { shared.sfxForce("ssr"); return; } catch (e) { }
+    }
+    if (typeof shared.sfx === "function") {
+      try { shared.sfx("ssr"); return; } catch (e) { }
+    }
+  }
+  try {
+    const c = zsAudio();
+    if (!c) return;
+    const t = c.currentTime + 0.005;
+    const notes = [523, 659, 784, 1047, 1319];
+    for (let i = 0; i < notes.length; i++) {
+      zsTone(c, notes[i], t + i * 0.075, 0.36, "sine", 0.07);
+    }
+  } catch (e) { }
+};
+const zsWarm = () => {
+  const shared = window.__k2Shared;
+  if (shared && typeof shared.warm === "function") {
+    try { shared.warm(); return; } catch (e) { }
+  }
+  zsAudio();
+};
+
+let zsPend = null;
+let zsHooked = false;
+const zsHint = (nodeId, msg) => {
+  try {
+    const n = app.graph && typeof app.graph.getNodeById === "function" ? app.graph.getNodeById(nodeId) : null;
+    const h = n && n.__zsHint;
+    if (!h) return;
+    if (h.__t) { clearTimeout(h.__t); h.__t = null; }
+    if (!msg) { h.style.display = "none"; h.textContent = ""; return; }
+    h.textContent = msg;
+    h.style.display = "block";
+    h.__t = setTimeout(() => { h.style.display = "none"; }, 4200);
+  } catch (e) { }
+};
+const zsAutoSave = () => {
+  if (zsHooked) return;
+  zsHooked = true;
+  const drop = () => { zsPend = null; };
+  api.addEventListener("execution_error", drop);
+  api.addEventListener("execution_interrupted", drop);
+  api.addEventListener("execution_success", async (ev) => {
+    const pid = ev && ev.detail && ev.detail.prompt_id;
+    if (!pid || !zsPend) return;
+    const job = zsPend;
+    zsPend = null;
+    if (job.at && Date.now() - job.at > 600000) return;
+    try {
+      const res = await api.fetchApi("/luori/k2/gallery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: job.text,
+          seed: job.seed || "",
+          source: job.source,
+          rarity: "",
+          prompt_id: pid,
+          require_image: true,
+          node_id: job.nodeId,
+        }),
+      });
+      let info = null;
+      try { info = await res.json(); } catch (e) { }
+      if (info && info.skipped === "no_image") zsHint(job.nodeId, "没有出图，未存进词图库");
+      else if (info && info.skipped === "unused") zsHint(job.nodeId, "输出没接线，未存进词图库");
+      else if (info && info.error === "full") zsHint(job.nodeId, "词图库已满 1000 条，未存档");
+      else if (res && res.status === 201) zsHint(job.nodeId, "");
+    } catch (e) { }
+  });
+};
+
 let cssDone = false;
 function injectCSS() {
   if (cssDone) return;
@@ -246,6 +363,46 @@ function injectCSS() {
   color:var(--dim);border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.03);
   transition:color .16s,border-color .16s;}
 .zs-btn:hover{color:#fff;border-color:rgba(255,255,255,.24);}
+.zs-btn.zs-neon{position:relative;overflow:hidden;color:#fff;font-weight:700;
+  border:1px solid transparent;text-shadow:0 0 7px rgba(255,255,255,.6);
+  background:
+    linear-gradient(135deg,rgba(26,12,48,.86),rgba(26,12,48,.86)) padding-box,
+    linear-gradient(90deg,#FF3D71,#FF8A3D,#FFD166,#4ADE80,#22D3EE,#8B2FF7,#FF2E93,#FF3D71) border-box;
+  background-size:100% 100%,300% 100%;
+  box-shadow:
+    0 0 0 1px rgba(255,61,113,.66),
+    0 0 8px rgba(255,61,113,.6),
+    0 0 17px rgba(34,211,238,.4),
+    0 0 28px rgba(139,47,247,.32),
+    inset 0 0 10px rgba(255,255,255,.12);
+  animation:zsnRainbow 2.2s linear infinite,zsnNeon 2.6s ease-in-out infinite;}
+.zs-btn.zs-neon::after{content:"";position:absolute;top:0;left:0;width:46%;height:100%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.68),transparent);
+  transform:translateX(-160%);opacity:0;pointer-events:none;
+  animation:zsnSweep 2.4s ease-in-out infinite;}
+.zs-btn.zs-neon:hover{color:#fff;
+  background:
+    linear-gradient(135deg,rgba(52,26,86,.92),rgba(52,26,86,.92)) padding-box,
+    linear-gradient(90deg,#FF3D71,#FF8A3D,#FFD166,#4ADE80,#22D3EE,#8B2FF7,#FF2E93,#FF3D71) border-box;
+  background-size:100% 100%,300% 100%;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.5),
+    0 0 12px rgba(255,61,113,.8),
+    0 0 24px rgba(34,211,238,.58),
+    0 0 38px rgba(139,47,247,.48),
+    inset 0 0 14px rgba(255,255,255,.2);}
+@keyframes zsnRainbow{0%{background-position:0 0,0% 50%;}100%{background-position:0 0,300% 50%;}}
+@keyframes zsnNeon{0%,100%{filter:brightness(1);}50%{filter:brightness(1.3);}}
+@keyframes zsnSweep{
+  0%{transform:translateX(-160%);opacity:0;}
+  55%{transform:translateX(-160%);opacity:0;}
+  65%{opacity:.85;}
+  88%{transform:translateX(320%);opacity:0;}
+  100%{transform:translateX(320%);opacity:0;}
+}
+@media (prefers-reduced-motion:reduce){
+  .zs-btn.zs-neon,.zs-btn.zs-neon::after{animation:none;}
+}
 .zs-size{margin-left:auto;flex:0 0 auto;padding:2px 9px;border-radius:99px;
   font:700 10px/1.35 inherit;color:#9FE1CB;border:1px solid rgba(29,158,117,.42);
   background:rgba(29,158,117,.13);}
@@ -464,6 +621,39 @@ function injectCSS() {
 .zs-w input::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;
   border-radius:50%;background:#fff;box-shadow:0 0 6px rgba(255,61,113,.9);cursor:pointer;}
 .zs-w b{font:700 10px/1 Consolas,monospace;color:#FFB7D0;flex:0 0 26px;text-align:right;}
+.zs-res{margin-top:10px;}
+.zs-res-l{font:800 9px/1 inherit;letter-spacing:.14em;color:var(--dim);margin-bottom:6px;
+  display:flex;align-items:center;gap:6px;}
+.zs-res-l::after{content:"";flex:1;height:1px;background:var(--ln);}
+.zs-res-box{min-height:58px;max-height:120px;overflow:auto;padding:10px 11px;border-radius:9px;
+  border:1px solid var(--ln);background:rgba(255,255,255,.035);font:11.5px/1.65 inherit;color:var(--tx);
+  word-break:break-word;transition:border-color .18s;}
+.zs-res-box.live{border-color:rgba(255,138,61,.45);animation:zsResIn .22s ease-out;}
+.zs-res-box.empty{color:#7A7299;font-size:10.5px;display:flex;align-items:center;}
+@keyframes zsResIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+.zs-bar{display:flex;align-items:center;gap:5px;margin-top:9px;padding-top:9px;
+  border-top:1px solid var(--ln);overflow:visible;flex-wrap:nowrap;}
+.zs-bar::-webkit-scrollbar{display:none;}
+.zs-bar>.zs-btn{flex:0 0 auto;height:24px;padding:0 9px;border-radius:99px;font-size:10px;white-space:nowrap;}
+.zs-hist{flex:0 0 auto;position:relative;}
+.zs-hist>summary{list-style:none;cursor:pointer;height:24px;padding:0 9px;display:flex;align-items:center;
+  border:1px solid rgba(255,255,255,.09);border-radius:99px;font:700 10px/1 inherit;color:var(--dim);
+  background:rgba(255,255,255,.03);white-space:nowrap;}
+.zs-hist>summary::-webkit-details-marker{display:none;}
+.zs-hist[open]>summary{color:var(--tx);border-color:var(--o);}
+.zs-histbox{display:none;margin-top:8px;max-height:228px;overflow:auto;padding:6px;
+  background:rgba(0,0,0,.26);border:1px solid var(--ln);border-radius:10px;}
+.zs-histbox::-webkit-scrollbar{width:8px;}
+.zs-histbox::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:99px;}
+.zs-btn.zs-on{color:#fff;border-color:var(--c1);background:rgba(255,255,255,.09);}
+.zs-hitem{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:8px;
+  font-size:10.5px;line-height:1.5;color:var(--tx);cursor:pointer;overflow:hidden;
+  border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02);
+  transition:border-color .16s,background .16s;}
+.zs-hitem .zs-hs{flex:0 0 auto;font:600 9px/1.5 inherit;color:var(--dim);white-space:nowrap;}
+.zs-hitem .zs-ht{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.zs-hitem:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);}
+.zs-hitem.zs-hit{border-color:var(--c1);background:rgba(255,255,255,.12);}
 `;
   document.head.appendChild(s);
 }
@@ -886,6 +1076,8 @@ function makeSeedRow(node) {
 
   paint();
   row.__paint = paint;
+  row.__setFixed = setFixed;
+  row.__isFixed = isFixed;
   return row;
 }
 
@@ -1141,6 +1333,155 @@ function buildDrawerPanel(node) {
       if (trig.__ta.value !== v) trig.__ta.value = v;
     }
   }
+
+  const resWrap = el("div", "zs-res");
+  resWrap.appendChild(el("div", "zs-res-l", "抽卡结果 / DRAW"));
+  const resBox = el("div", "zs-res-box empty", "运行一次后，这里会显示抽到的词。");
+  resWrap.appendChild(resBox);
+  const resHint = el("div", "zs-hint");
+  resHint.style.cssText = "display:none;margin-top:4px;color:#FFB35C;font-size:10px;";
+  resWrap.appendChild(resHint);
+  node.__zsHint = resHint;
+  body.appendChild(resWrap);
+
+  const bar = el("div", "zs-bar");
+  const bCopy = el("button", "zs-btn", "复制");
+  const bSfx = el("button", "zs-btn", "音效");
+  const bTheme = el("button", "zs-btn", "配色");
+  const bGal = el("button", "zs-btn zs-neon", "词图库");
+  const bHist = el("button", "zs-btn", "历史 0");
+  bHist.type = "button";
+  const histBox = el("div", "zs-histbox");
+  bar.append(bCopy, bSfx, bTheme, bGal, bHist);
+  body.appendChild(bar);
+  body.appendChild(histBox);
+  bCopy.type = bSfx.type = bTheme.type = bGal.type = "button";
+
+  const fit = () => {
+    try { ptrLast = 0; } catch (e) { }
+    relayout(node, node.__zsCtx?.root);
+  };
+  const hideHist = () => {
+    histBox.style.display = "none";
+    bHist.classList.remove("zs-on");
+    setTimeout(fit, 30);
+  };
+  const showHist = () => {
+    paintBar();
+    histBox.style.display = "block";
+    bHist.classList.add("zs-on");
+    setTimeout(fit, 30);
+  };
+
+  bHist.onclick = (ev) => {
+    ev.stopPropagation();
+    if (histBox.style.display === "block") hideHist();
+    else showHist();
+  };
+
+  const histArr = () => {
+    if (!node.properties) node.properties = {};
+    if (!Array.isArray(node.properties.__zsHist)) node.properties.__zsHist = [];
+    return node.properties.__zsHist;
+  };
+
+  const latestText = () => {
+    const arr = histArr();
+    return arr.length ? String(arr[arr.length - 1].text || "") : "";
+  };
+
+  bCopy.onclick = async () => {
+    const text = latestText();
+    if (!text) {
+      bCopy.textContent = "无内容";
+      setTimeout(() => { bCopy.textContent = "复制"; }, 900);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      bCopy.textContent = "已复制";
+    } catch (e) {
+      bCopy.textContent = "失败";
+    }
+    setTimeout(() => { bCopy.textContent = "复制"; }, 900);
+  };
+
+  const paintSfx = () => {
+    bSfx.classList.toggle("zs-on", zsSfxOn);
+    bSfx.title = zsSfxOn ? "音效已开：每次运行播放 SSR 音效，点一下关闭" : "音效已关：运行时不发声，点一下开启";
+  };
+  paintSfx();
+  bSfx.onclick = () => {
+    zsSfxOn = !zsSfxOn;
+    try { localStorage.setItem("zs_sfx", zsSfxOn ? "1" : "0"); } catch (e) { }
+    paintSfx();
+    zsBlip(zsSfxOn ? "on" : "off");
+  };
+
+  bTheme.onclick = () => {
+    const shared = window.__k2Shared;
+    if (!shared) {
+      bTheme.textContent = "先开抽卡节点";
+      setTimeout(() => { bTheme.textContent = "配色"; }, 1200);
+      return;
+    }
+    const i = shared.cycle();
+    bTheme.textContent = shared.themes[i].name;
+    setTimeout(() => { bTheme.textContent = "配色"; }, 1200);
+  };
+
+  bGal.onclick = () => {
+    if (typeof window.__k2GalleryOpen === "function") {
+      window.__k2GalleryOpen({ hideReuse: true });
+    } else {
+      bGal.textContent = "先开抽卡节点";
+      setTimeout(() => { bGal.textContent = "词图库"; }, 1200);
+    }
+  };
+
+  const paintBar = () => {
+    const arr = histArr();
+    bHist.textContent = "历史 " + arr.length;
+    const last = arr.length ? String(arr[arr.length - 1].text || "") : "";
+    if (last) {
+      if (resBox.textContent !== last) {
+        resBox.textContent = last;
+        resBox.classList.remove("empty");
+        resBox.classList.add("live");
+        setTimeout(() => { resBox.classList.remove("live"); }, 240);
+      }
+    } else if (!resBox.classList.contains("empty")) {
+      resBox.textContent = "运行一次后，这里会显示抽到的词。";
+      resBox.classList.add("empty");
+    }
+    histBox.replaceChildren();
+    if (!arr.length) {
+      histBox.append(el("div", "zs-hitem", "还没有记录，运行一次就有了"));
+      return;
+    }
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const it = arr[i] || {};
+      const text = String(it.text || "");
+      const sd = Number(it.seed) || 0;
+      const row = el("div", "zs-hitem");
+      row.appendChild(el("span", "zs-hs", sd ? "种子 " + sd : "无种子"));
+      row.appendChild(el("span", "zs-ht", text));
+      row.title = (sd ? "种子 " + sd : "旧记录没有种子，只能复制") + "\n" + text + "\n点一下：复制并锁定种子";
+      row.onclick = async () => {
+        try { await navigator.clipboard.writeText(text); } catch (e) { }
+        if (sd) {
+          if (refs.seed && typeof refs.seed.__setFixed === "function") refs.seed.__setFixed(true);
+          writeW(node, "seed", sd);
+          sync();
+        }
+        row.classList.add("zs-hit");
+        setTimeout(() => row.classList.remove("zs-hit"), 380);
+      };
+      histBox.append(row);
+    }
+  };
+  node.__zsPaintBar = paintBar;
+  paintBar();
 
   return { root: makeRoot(node), body, sync, refs };
 }
@@ -1901,6 +2242,7 @@ function install(node) {
 
   injectCSS();
   bindPointerWatch();
+  zsAutoSave();
   installPainting(node);
   ensureHidden(node);
   ensureWearWidth(node);
@@ -1920,6 +2262,38 @@ function install(node) {
   root.appendChild(built.body);
 
   node.__zsCtx = { root, sync: built.sync, cls };
+
+  if (!root.__zsWarmed) {
+    root.__zsWarmed = true;
+    root.addEventListener("pointerdown", zsWarm, { passive: true });
+  }
+
+  if (cls === "ZImagePromptLoaderNode") {
+    chain(node, "onExecuted", (out) => {
+      try {
+        const raw = out && out.text;
+        const arr = Array.isArray(raw) ? raw : (raw != null ? [raw] : []);
+        const text = arr.length ? String(arr[arr.length - 1] || "") : "";
+        if (!text) return;
+        const sd = Number(Array.isArray(out.seed) ? out.seed[0] : out.seed) || 0;
+        if (!node.properties) node.properties = {};
+        if (!Array.isArray(node.properties.__zsHist)) node.properties.__zsHist = [];
+        node.properties.__zsHist.push({ text, at: Date.now(), seed: sd });
+        if (node.properties.__zsHist.length > 20) {
+          node.properties.__zsHist.splice(0, node.properties.__zsHist.length - 20);
+        }
+        zsPend = {
+          text: text,
+          seed: sd ? String(sd) : "",
+          source: "文生图",
+          nodeId: node.id,
+          at: Date.now(),
+        };
+        zsBeep();
+        if (typeof node.__zsPaintBar === "function") node.__zsPaintBar();
+      } catch (e) { }
+    });
+  }
 
   if (cls === "SunsetNSPromptSelector") {
     chain(node, "onExecuted", (out) => {
