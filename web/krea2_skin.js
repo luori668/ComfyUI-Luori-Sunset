@@ -344,6 +344,67 @@ const el = (tag, cls, text) => {
   return n;
 };
 
+const GALLERY_SKINS = [
+  {
+    id: "neon", name: "霓虹粉",
+    bg1: "#1B0F33", bg2: "#0D0719", g1: "rgba(255,46,147,.20)",
+    o: "#FF8A3D", p: "#FF2E93",
+    grad: "linear-gradient(120deg,#FF3D71,#FF8A3D,#FFD166,#FF2E93,#8B2FF7,#FF3D71)",
+    sw: "conic-gradient(#FF3D71,#FF8A3D,#FFD166,#FF2E93,#8B2FF7,#FF3D71)",
+  },
+  {
+    id: "aurora", name: "极光青",
+    bg1: "#0B2430", bg2: "#06131B", g1: "rgba(34,211,238,.20)",
+    o: "#22D3EE", p: "#4ADE80",
+    grad: "linear-gradient(120deg,#22D3EE,#4ADE80,#FFD166,#3B82F6,#8B2FF7,#22D3EE)",
+    sw: "conic-gradient(#22D3EE,#4ADE80,#FFD166,#3B82F6,#8B2FF7,#22D3EE)",
+  },
+  {
+    id: "lava", name: "熔岩红",
+    bg1: "#2A0C0C", bg2: "#140505", g1: "rgba(255,61,113,.22)",
+    o: "#FF6B35", p: "#E5322D",
+    grad: "linear-gradient(120deg,#E5322D,#FF6B35,#FFD166,#FF2E93,#8B2FF7,#E5322D)",
+    sw: "conic-gradient(#E5322D,#FF6B35,#FFD166,#FF2E93,#8B2FF7,#E5322D)",
+  },
+  {
+    id: "jade", name: "翡翠绿",
+    bg1: "#0B2418", bg2: "#05120C", g1: "rgba(74,222,128,.18)",
+    o: "#4ADE80", p: "#22D3EE",
+    grad: "linear-gradient(120deg,#4ADE80,#22D3EE,#FFD166,#10B981,#8B2FF7,#4ADE80)",
+    sw: "conic-gradient(#4ADE80,#22D3EE,#FFD166,#10B981,#8B2FF7,#4ADE80)",
+  },
+  {
+    id: "gold", name: "暗金",
+    bg1: "#241B08", bg2: "#120D04", g1: "rgba(255,176,32,.20)",
+    o: "#FFB020", p: "#FF8A3D",
+    grad: "linear-gradient(120deg,#FFB020,#FFD166,#FF8A3D,#FF3D71,#8B2FF7,#FFB020)",
+    sw: "conic-gradient(#FFB020,#FFD166,#FF8A3D,#FF3D71,#8B2FF7,#FFB020)",
+  },
+  {
+    id: "galaxy", name: "星云紫",
+    bg1: "#1A0F3A", bg2: "#090418", g1: "rgba(139,47,247,.26)",
+    o: "#8B2FF7", p: "#22D3EE",
+    grad: "linear-gradient(120deg,#8B2FF7,#22D3EE,#FF2E93,#FFD166,#4ADE80,#8B2FF7)",
+    sw: "conic-gradient(#8B2FF7,#22D3EE,#FF2E93,#FFD166,#4ADE80,#8B2FF7)",
+  },
+];
+
+let gallerySkin = "neon";
+try {
+  const saved = localStorage.getItem("k2g_skin");
+  if (saved) gallerySkin = saved;
+} catch (e) { }
+
+function applyGallerySkin(winEl) {
+  const s = GALLERY_SKINS.find((x) => x.id === gallerySkin) || GALLERY_SKINS[0];
+  winEl.style.setProperty("--bg1", s.bg1);
+  winEl.style.setProperty("--bg2", s.bg2);
+  winEl.style.setProperty("--g1", s.g1);
+  winEl.style.setProperty("--o", s.o);
+  winEl.style.setProperty("--p", s.p);
+  winEl.style.setProperty("--skin-grad", s.grad);
+}
+
 
 let cssDone = false;
 function injectCSS() {
@@ -850,9 +911,36 @@ function injectCSS() {
 .k2g-act:hover{border-color:var(--o,#FF8A3D);box-shadow:0 0 12px rgba(255,138,61,.18);}
 .k2g-grid{flex:1;overflow:auto;padding:16px 18px 22px;display:grid;
   grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;align-content:start;}
-.k2g-card{display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:rgba(255,255,255,.035);
+.k2g-card{position:relative;display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:rgba(255,255,255,.035);
   border:1px solid rgba(255,255,255,.09);transition:transform .14s ease,border-color .14s,box-shadow .14s;}
-.k2g-card:hover{transform:translateY(-2px);border-color:rgba(255,138,61,.55);box-shadow:0 12px 28px rgba(0,0,0,.5);}
+.k2g-card::before{content:"";position:absolute;inset:0;border-radius:12px;padding:1px;pointer-events:none;z-index:2;
+  background:var(--skin-grad,linear-gradient(120deg,#FF3D71,#FF8A3D,#FFD166,#FF2E93,#8B2FF7,#FF3D71));
+  background-size:300% 100%;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  opacity:.55;transition:opacity .16s;}
+.k2g-card:hover{transform:translateY(-2px);border-color:transparent;box-shadow:0 12px 30px rgba(0,0,0,.55),0 0 18px rgba(139,92,246,.32);}
+.k2g-card:hover::before{opacity:1;animation:k2gFlow 2.6s linear infinite;}
+@keyframes k2gFlow{0%{background-position:0% 50%;}100%{background-position:300% 50%;}}
+.k2g-skin{position:absolute;right:16px;bottom:46px;z-index:7;}
+.k2g-skin-btn{height:30px;padding:0 14px;border-radius:99px;cursor:pointer;display:inline-flex;
+  align-items:center;gap:7px;border:1px solid rgba(255,255,255,.18);background:rgba(20,12,38,.92);
+  color:#EDE9FE;font:11px/1 inherit;box-shadow:0 8px 22px rgba(0,0,0,.5);backdrop-filter:blur(8px);
+  transition:border-color .14s,box-shadow .14s;}
+.k2g-skin-btn:hover{border-color:rgba(255,255,255,.42);box-shadow:0 8px 26px rgba(139,92,246,.4);}
+.k2g-skin-btn>i{width:12px;height:12px;border-radius:50%;flex:0 0 auto;
+  background:conic-gradient(#FF3D71,#FF8A3D,#FFD166,#4ADE80,#22D3EE,#8B2FF7,#FF2E93,#FF3D71);
+  box-shadow:0 0 7px rgba(255,255,255,.4);}
+.k2g-skin-pop{position:absolute;right:0;bottom:38px;display:none;width:186px;padding:7px;
+  border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(18,10,34,.97);
+  box-shadow:0 18px 44px rgba(0,0,0,.72);backdrop-filter:blur(12px);}
+.k2g-skin-pop.on{display:block;}
+.k2g-skin-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;
+  cursor:pointer;font-size:11px;color:#CFC7EA;border:1px solid transparent;transition:all .12s;}
+.k2g-skin-item:hover{background:rgba(255,255,255,.07);}
+.k2g-skin-item.on{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.06);color:#fff;}
+.k2g-skin-item>i{width:16px;height:16px;border-radius:5px;flex:0 0 auto;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.28),0 0 8px rgba(0,0,0,.4);}
 .k2g-thumb{position:relative;width:100%;aspect-ratio:3/4;background:rgba(0,0,0,.3);
   overflow:hidden;cursor:zoom-in;}
 .k2g-thumb img{width:100%;height:100%;object-fit:contain;display:block;transition:transform .25s ease;}
@@ -1580,6 +1668,7 @@ function buildPanel(node) {
     const mask = el("div", "k2g-mask");
     applyTheme(mask);
     const win = el("div", "k2g-win");
+    applyGallerySkin(win);
     mask.appendChild(win);
     galleryMask = mask;
     document.body.append(mask);
@@ -1671,6 +1760,39 @@ function buildPanel(node) {
     const foot = el("div", "k2g-foot", "点缩略图看大图 · 双击提示词复制全文 · Esc 关闭");
 
     win.append(head, warn, tools, grid, foot);
+
+    const skinWrap = el("div", "k2g-skin");
+    const skinBtn = el("button", "k2g-skin-btn");
+    skinBtn.type = "button";
+    skinBtn.title = "切换词图库配色";
+    skinBtn.appendChild(el("i"));
+    skinBtn.appendChild(document.createTextNode("配色"));
+    const skinPop = el("div", "k2g-skin-pop");
+    for (const sk of GALLERY_SKINS) {
+      const item = el("div", "k2g-skin-item" + (sk.id === gallerySkin ? " on" : ""));
+      const dot = el("i");
+      dot.style.background = sk.sw;
+      item.appendChild(dot);
+      item.appendChild(el("span", null, sk.name));
+      item.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        gallerySkin = sk.id;
+        try { localStorage.setItem("k2g_skin", sk.id); } catch (e) { }
+        applyGallerySkin(win);
+        for (const c of skinPop.children) c.classList.toggle("on", c === item);
+        skinPop.classList.remove("on");
+      });
+      skinPop.appendChild(item);
+    }
+    skinBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      skinPop.classList.toggle("on");
+    });
+    skinWrap.append(skinBtn, skinPop);
+    win.appendChild(skinWrap);
+    win.addEventListener("click", (ev) => {
+      if (!skinWrap.contains(ev.target)) skinPop.classList.remove("on");
+    });
 
     const updateCount = (total, limit, warnAt) => {
       countEl.textContent = total + " / " + limit;
