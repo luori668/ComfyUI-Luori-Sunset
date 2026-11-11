@@ -2,6 +2,8 @@ import asyncio
 import json
 import os
 import re
+import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -90,6 +92,16 @@ def _image_base(kind):
     return Path(folder_paths.get_output_directory()).resolve()
 
 
+def _open_output_dir():
+    target = Path(folder_paths.get_output_directory()).resolve()
+    target.mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        os.startfile(str(target))
+    else:
+        subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(target)])
+    return target
+
+
 def _output_path(filename, subfolder="", kind="output"):
     base = _image_base(kind)
     target = (base / str(subfolder or "") / str(filename or "")).resolve()
@@ -145,6 +157,9 @@ def _public(row):
         "created": row.get("created", ""),
         "has_image": bool(row.get("thumb") or row.get("stored") or row.get("image")),
         "thumb_url": "/luori/k2/gallery/thumb/" + row.get("id", "") if row.get("thumb") else "",
+        "params": row.get("params") or {},
+        "stages": row.get("stages") or [],
+        "file": str((row.get("image") or {}).get("filename") or row.get("stored") or ""),
     }
 
 
@@ -225,6 +240,176 @@ def _on_image_chain(prompt_id, node_id):
     return False
 
 
+def _prompt_graph(prompt_id):
+    if not prompt_id:
+        return None, None
+    try:
+        history = PromptServer.instance.prompt_queue.get_history(prompt_id=prompt_id)
+    except Exception:
+        return None, None
+    entry = (history or {}).get(prompt_id) or {}
+    item = entry.get("prompt")
+    graph = item[2] if isinstance(item, (list, tuple)) and len(item) > 2 else None
+    if not isinstance(graph, dict):
+        return None, None
+    return graph, entry
+
+
+def _chain_nodes(graph, entry):
+    roots = []
+    for nid, out in (entry.get("outputs") or {}).items():
+        if not isinstance(out, dict):
+            continue
+        for key in ("images", "gifs", "videos"):
+            val = out.get(key)
+            if isinstance(val, list) and val:
+                roots.append(str(nid))
+                break
+    if not roots:
+        return None
+    seen = set()
+    stack = list(roots)
+    while stack:
+        nid = stack.pop()
+        if nid in seen:
+            continue
+        seen.add(nid)
+        spec = graph.get(nid)
+        inputs = spec.get("inputs") if isinstance(spec, dict) else None
+        if isinstance(inputs, dict):
+            for val in inputs.values():
+                if isinstance(val, (list, tuple)) and len(val) == 2:
+                    stack.append(str(val[0]))
+    return seen
+
+
+def _resolve_value(graph, val, hops=0):
+    if isinstance(val, (list, tuple)) and val:
+        if hops >= 5:
+            return None
+        up = graph.get(str(val[0]))
+        ins = up.get("inputs") if isinstance(up, dict) else None
+        if isinstance(ins, dict):
+            for key in ("seed", "noise_seed", "sampler_name", "scheduler", "value", "int", "number", "steps", "cfg"):
+                if key in ins:
+                    return _resolve_value(graph, ins[key], hops + 1)
+        return None
+    if isinstance(val, (dict, list, tuple)):
+        return None
+    return val
+
+
+def _sampler_depth(graph, nid, sset, seen):
+    if nid in seen:
+        return 0
+    seen = set(seen)
+    seen.add(nid)
+    spec = graph.get(nid)
+    ins = spec.get("inputs") if isinstance(spec, dict) else None
+    best = 0
+    if isinstance(ins, dict):
+        for val in ins.values():
+            if isinstance(val, (list, tuple)) and val:
+                up = str(val[0])
+                if up in graph:
+                    d = _sampler_depth(graph, up, sset, seen)
+                    if up in sset:
+                        d += 1
+                    if d > best:
+                        best = d
+    return best
+
+
+def _node_key(nid):
+    try:
+        return (0, int(nid))
+    except Exception:
+        return (1, str(nid))
+
+
+def _build_stages(graph, ids, chain):
+    if chain is not None:
+        ids = [n for n in ids if n in chain]
+    if not ids:
+        return []
+    sset = set(ids)
+    depth = {n: _sampler_depth(graph, n, sset, set()) for n in ids}
+    ids.sort(key=lambda n: (depth[n], _node_key(n)))
+    labels = ["一采", "二采", "三采", "四采", "五采", "六采", "七采", "八采", "九采", "十采"]
+    fields = [("seed", ("seed", "noise_seed")), ("steps", ("steps",)), ("cfg", ("cfg",)),
+              ("sampler", ("sampler_name", "sampler")), ("scheduler", ("scheduler",)),
+              ("denoise", ("denoise",)), ("start", ("start_at_step",)), ("end", ("end_at_step",))]
+    out = []
+    for i, nid in enumerate(ids):
+        spec = graph.get(nid)
+        ins = spec.get("inputs") if isinstance(spec, dict) else None
+        if not isinstance(ins, dict):
+            continue
+        st = {"label": labels[i] if i < len(labels) else str(i + 1) + "采",
+              "node": "#" + str(nid), "kind": str(spec.get("class_type") or "")}
+        for key, sources in fields:
+            for src in sources:
+                if src not in ins:
+                    continue
+                val = _resolve_value(graph, ins[src])
+                if val is not None and val != "" and not isinstance(val, (list, tuple, dict)):
+                    st[key] = val
+                    break
+        out.append(st)
+    return out
+
+
+def _extract_all(prompt_id):
+    graph, entry = _prompt_graph(prompt_id)
+    if graph is None:
+        return {"params": {}, "stages": []}
+    out = {}
+    fields = {"steps": "steps", "cfg": "cfg", "sampler_name": "sampler",
+              "scheduler": "scheduler", "denoise": "denoise"}
+    loras = []
+    sampler_ids = []
+    for nid, spec in graph.items():
+        if not isinstance(spec, dict):
+            continue
+        ct = str(spec.get("class_type") or "")
+        ins = spec.get("inputs")
+        if not isinstance(ins, dict):
+            continue
+        low = ct.lower()
+        if "sampler" in low and "select" not in low:
+            sampler_ids.append(str(nid))
+        if "sampler" in low or "scheduler" in low:
+            for key, field in fields.items():
+                val = ins.get(key)
+                if field not in out and not isinstance(val, (list, tuple, dict)) and val not in (None, ""):
+                    out[field] = val
+        if any(tag in ct for tag in ("CheckpointLoader", "UNETLoader", "UnetLoader", "ModelLoader")):
+            for key in ("ckpt_name", "unet_name", "model_name"):
+                val = ins.get(key)
+                if isinstance(val, str) and val and "model" not in out:
+                    out["model"] = val
+        if ct.startswith("Empty") and "Latent" in ct:
+            width = ins.get("width")
+            height = ins.get("height")
+            if isinstance(width, int) and isinstance(height, int) and "size" not in out:
+                out["size"] = str(width) + "x" + str(height)
+        if "LoraLoader" in ct:
+            val = ins.get("lora_name")
+            if isinstance(val, str) and val and val not in loras and len(loras) < 6:
+                loras.append(val)
+    if loras:
+        out["loras"] = ", ".join(loras)
+    chain = _chain_nodes(graph, entry)
+    return {"params": out, "stages": _build_stages(graph, sampler_ids, chain)}
+
+
+def _extract_params(prompt_id):
+    return _extract_all(prompt_id)["params"]
+
+
+def _extract_stages(prompt_id):
+    return _extract_all(prompt_id)["stages"]
+
 def add_item(prompt, seed="", source="", rarity="", prompt_id="", require_image=False, image=_MISSING, node_id=""):
     text = str(prompt or "").strip()
     if not text:
@@ -254,6 +439,8 @@ def add_item(prompt, seed="", source="", rarity="", prompt_id="", require_image=
             "rarity": str(rarity or ""),
             "created": _now(),
             "star": False,
+            "params": _extract_params(pid),
+            "stages": _extract_stages(pid),
             "image": image or {},
             "thumb": "",
             "stored": "",
@@ -292,6 +479,8 @@ def add_upload(data_bytes, prompt, filename="", source="手动"):
             "rarity": "",
             "created": _now(),
             "star": False,
+            "params": {},
+            "stages": [],
             "image": {"filename": str(filename or "")},
             "thumb": "",
             "stored": "",
@@ -525,3 +714,12 @@ async def gallery_export(request):
         charset="utf-8",
         headers={"Content-Disposition": 'attachment; filename="luori_prompts_%s.txt"' % stamp},
     )
+
+
+@routes.post("/luori/k2/gallery/open_output")
+async def gallery_open_output(request):
+    try:
+        target = _open_output_dir()
+        return web.json_response({"ok": True, "path": str(target)})
+    except Exception as exc:
+        return web.json_response({"ok": False, "error": str(exc)[:120]}, status=500)
