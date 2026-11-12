@@ -1,7 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
-const SKIN_VERSION = "3.26";
+const SKIN_VERSION = "3.27";
 
 
 const CONFIG = {
@@ -968,6 +968,11 @@ function injectCSS() {
 .k2g-star{position:absolute;top:7px;right:7px;width:26px;height:26px;border-radius:50%;border:0;
   background:rgba(0,0,0,.42);color:#9A90C4;cursor:pointer;font-size:13px;line-height:26px;text-align:center;backdrop-filter:blur(4px);}
 .k2g-star.on{color:#FFD166;text-shadow:0 0 10px rgba(255,209,102,.6);}
+.k2g-dup{position:absolute;top:8px;right:39px;z-index:4;height:20px;padding:0 8px;border-radius:99px;
+  border:1px solid rgba(255,209,102,.55);background:rgba(38,20,8,.8);color:#FFD166;
+  font:700 10px/18px inherit;cursor:pointer;backdrop-filter:blur(4px);
+  box-shadow:0 3px 10px rgba(0,0,0,.5);transition:filter .14s,transform .14s;}
+.k2g-dup:hover{filter:brightness(1.25);transform:translateY(-1px);}
 .k2g-body{padding:9px 10px 6px;display:flex;flex-direction:column;gap:5px;}
 .k2g-txt{margin:0;font-size:11px;line-height:1.5;color:#D8D2F0;display:-webkit-box;-webkit-line-clamp:2;
   -webkit-box-orient:vertical;overflow:hidden;word-break:break-word;min-height:33px;}
@@ -1724,6 +1729,8 @@ function buildPanel(node) {
   let galleryQ = "";
   let gallerySrc = "";
   let galleryStar = false;
+  let galleryDup = false;
+  let dupKey = "";
   let gallerySort = "new";
   let galleryPage = 1;
   let gallerySel = new Set();
@@ -1853,6 +1860,20 @@ function buildPanel(node) {
     const chipStar = el("button", "k2g-chip", "★ 收藏");
     chipStar.type = "button";
     chipStar.onclick = () => { galleryStar = !galleryStar; chipStar.classList.toggle("on", galleryStar); galleryPage = 1; render(); };
+    const chipDup = el("button", "k2g-chip", "重复");
+    chipDup.type = "button";
+    chipDup.title = "只看有重复项的记录";
+    const paintDup = () => {
+      chipDup.textContent = dupKey ? "同词组 ×" : "重复";
+      chipDup.classList.toggle("on", galleryDup || !!dupKey);
+    };
+    chipDup.onclick = () => {
+      if (dupKey) { dupKey = ""; galleryDup = false; }
+      else galleryDup = !galleryDup;
+      galleryPage = 1;
+      paintDup();
+      render();
+    };
     const addSrcChip = (value) => {
       if (!value || knownSrc.has(value)) return;
       knownSrc.add(value);
@@ -1906,7 +1927,7 @@ function buildPanel(node) {
       btnCompact.classList.toggle("on", galleryCompact);
       grid.classList.toggle("k2g-compact", galleryCompact);
     };
-    tools.append(chipStar, sortSel, spacer, btnOutput, btnAdd, btnCompact);
+    tools.append(chipStar, chipDup, sortSel, spacer, btnOutput, btnAdd, btnCompact);
 
     const grid = el("div", "k2g-grid");
     const foot = el("div", "k2g-foot");
@@ -2362,6 +2383,8 @@ function buildPanel(node) {
       for (const it of galleryItems) addSrcChip(srcKey(it.source));
       const list = galleryItems.filter((it) => {
         if (galleryStar && !it.star) return false;
+        if (galleryDup && (Number(it.dup) || 1) < 2) return false;
+        if (dupKey && String(it.prompt || "").trim() !== dupKey) return false;
         if (gallerySrc && srcKey(it.source) !== gallerySrc) return false;
         if (galleryQ) {
           const hay = (String(it.prompt || "") + " " + String(it.seed || "") + " " + String(it.source || "")).toLowerCase();
@@ -2469,6 +2492,22 @@ function buildPanel(node) {
           paintSelBar();
         };
         thumb.appendChild(pick);
+        const dupN = Number(it.dup) || 1;
+        if (dupN > 1) {
+          const dupBadge = el("button", "k2g-dup", "×" + dupN);
+          dupBadge.type = "button";
+          dupBadge.title = "共 " + dupN + " 条同词记录，点击只看这一组";
+          dupBadge.onclick = (ev) => {
+            ev.stopPropagation();
+            const key = String(it.prompt || "").trim();
+            dupKey = dupKey === key ? "" : key;
+            galleryDup = true;
+            galleryPage = 1;
+            paintDup();
+            render();
+          };
+          thumb.appendChild(dupBadge);
+        }
 
         const body = el("div", "k2g-body");
         const txt = el("p", "k2g-txt", it.prompt || "");
