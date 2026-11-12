@@ -180,8 +180,17 @@ def _dir_bytes(path):
 def list_payload():
     data = _read()
     items = data.get("items", [])
+    counts = {}
+    for row in items:
+        key = str(row.get("prompt") or "").strip()
+        counts[key] = counts.get(key, 0) + 1
+    public_items = []
+    for row in items:
+        item = _public(row)
+        item["dup"] = counts.get(str(row.get("prompt") or "").strip(), 1)
+        public_items.append(item)
     return {
-        "items": [_public(row) for row in items],
+        "items": public_items,
         "total": len(items),
         "limit": LIMIT,
         "warn": WARN_AT,
@@ -410,11 +419,99 @@ def _extract_params(prompt_id):
 def _extract_stages(prompt_id):
     return _extract_all(prompt_id)["stages"]
 
+
+def _as_text(val):
+    return val.strip() if isinstance(val, str) else ""
+
+
+def _outputs_text(entry, chain):
+    found = []
+    outputs = entry.get("outputs") or {}
+    for nid in sorted(outputs, key=_node_key):
+        if chain is not None and str(nid) not in chain:
+            continue
+        spec = outputs.get(nid)
+        if not isinstance(spec, dict):
+            continue
+        for key in ("text", "string"):
+            val = spec.get(key)
+            rows = val if isinstance(val, (list, tuple)) else [val]
+            for row in rows:
+                s = _as_text(row)
+                if s and s not in found and not s.startswith("（未开启"):
+                    found.append(s)
+    return found
+
+
+def _upstream(graph, seeds):
+    seen = set()
+    stack = list(seeds)
+    while stack:
+        nid = stack.pop()
+        if nid in seen:
+            continue
+        seen.add(nid)
+        spec = graph.get(nid)
+        ins = spec.get("inputs") if isinstance(spec, dict) else None
+        if isinstance(ins, dict):
+            for val in ins.values():
+                if isinstance(val, (list, tuple)) and len(val) == 2:
+                    stack.append(str(val[0]))
+    return seen
+
+
+def _graph_texts(graph, chain):
+    pos_seeds = []
+    neg_seeds = []
+    for spec in graph.values():
+        ins = spec.get("inputs") if isinstance(spec, dict) else None
+        if not isinstance(ins, dict):
+            continue
+        for key, seeds in (("positive", pos_seeds), ("negative", neg_seeds)):
+            val = ins.get(key)
+            if isinstance(val, (list, tuple)) and len(val) == 2:
+                seeds.append(str(val[0]))
+    neg = _upstream(graph, neg_seeds) - _upstream(graph, pos_seeds)
+    found = []
+    for nid in sorted(graph, key=_node_key):
+        if chain is not None and str(nid) not in chain:
+            continue
+        if str(nid) in neg:
+            continue
+        spec = graph.get(nid)
+        ct = str(spec.get("class_type") or "") if isinstance(spec, dict) else ""
+        if "TextEncode" not in ct and ct not in ("PrimitiveNode", "PrimitiveString", "Text"):
+            continue
+        ins = spec.get("inputs")
+        if not isinstance(ins, dict):
+            continue
+        for key in ("text", "value", "string"):
+            s = _as_text(ins.get(key))
+            if s and s not in found:
+                found.append(s)
+                break
+    return found
+
+
+def auto_prompt(prompt_id):
+    graph, entry = _prompt_graph(prompt_id)
+    if graph is None:
+        return ""
+    chain = _chain_nodes(graph, entry)
+    rows = _outputs_text(entry, chain)
+    for s in _graph_texts(graph, chain):
+        if not any(s in r for r in rows):
+            rows.append(s)
+    return "\n".join(rows[:6])[:4000]
+
+
 def add_item(prompt, seed="", source="", rarity="", prompt_id="", require_image=False, image=_MISSING, node_id=""):
+    pid = str(prompt_id or "")
     text = str(prompt or "").strip()
+    if not text and pid:
+        text = auto_prompt(pid)
     if not text:
         raise ValueError("empty_prompt")
-    pid = str(prompt_id or "")
     with _save_lock:
         data = _read()
         items = data.get("items", [])
@@ -592,16 +689,24 @@ async def gallery_add(request):
         return web.json_response({"error": "bad_request"}, status=400)
     pid = str(body.get("prompt_id") or "")
     strict = bool(body.get("require_image"))
+    text = str(body.get("prompt") or "").strip()
+    want_auto = not text and bool(pid)
     image = _first_image(pid) if pid else None
-    if strict and image is None and pid:
-        for _ in range(12):
-            await asyncio.sleep(0.08)
+    if want_auto:
+        text = auto_prompt(pid)
+    for _ in range(12):
+        if (not strict or image is not None) and not (want_auto and not text):
+            break
+        if not pid:
+            break
+        await asyncio.sleep(0.08)
+        if image is None:
             image = _first_image(pid)
-            if image is not None:
-                break
+        if want_auto and not text:
+            text = auto_prompt(pid)
     try:
         row = add_item(
-            body.get("prompt", ""),
+            text,
             body.get("seed", ""),
             body.get("source", ""),
             body.get("rarity", ""),
