@@ -534,7 +534,6 @@ class ZImagePromptGeneratorNode:
             return rng.choice(p) if p else ""
 
         def pick_multi(refs):
-            """从多组候选池里随机挑一组再抽一条（池级别随机，不是条目级别）。"""
             filled = [(g, s) for g, s in refs if pool(g, s)]
             if not filled:
                 return ""
