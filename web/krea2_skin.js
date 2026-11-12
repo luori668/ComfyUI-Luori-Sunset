@@ -1,7 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
-const SKIN_VERSION = "3.27";
+const SKIN_VERSION = "3.30";
 
 
 const CONFIG = {
@@ -12,6 +12,8 @@ const CONFIG = {
   glow: true,           
   syncInterval: 400,    
 };
+
+const K2_MIN_PANEL_W = 240;
 
 const THEME = {
   orange: "#FF8A3D",
@@ -2831,6 +2833,9 @@ app.registerExtension({
     }
 
     const { root, body, sync, applyDraw } = buildPanel(node);
+    node.__k2ctx = { root, body };
+    k2LockWidth(node, root);
+    node.__k2StableH = k2Measure(node, root) || k2Height(node);
 
     bindDrawFeed();
     const regFeed = () => { if (node.id != null) DRAW_MAP.set(node.id, applyDraw); };
@@ -2846,20 +2851,24 @@ app.registerExtension({
     let domWidget = null;
     if (typeof node.addDOMWidget === "function") {
       domWidget = node.addDOMWidget("krea2_deck", "krea2ui", root, {
-        serialize: false,     
-        hideOnZoom: false,    
-        getHeight: () => panelH,
+        serialize: false,
+        hideOnZoom: false,
+        getHeight: () => k2Height(node),
+        getMinHeight: () => k2Height(node),
       });
       if (domWidget) {
-        domWidget.computeSize = () => [CONFIG.width, panelH];
-        node.__k2dm = domWidget;   
+        domWidget.computeSize = () => [k2PanelWidth(node), k2Height(node)];
+        domWidget.computeLayoutSize = () => ({
+          minHeight: k2Height(node),
+          minWidth: k2PanelWidth(node),
+        });
+        node.__k2dm = domWidget;
       }
     } else {
       console.warn("[Krea2Skin] 当前前端不支持 addDOMWidget，已降级为独立浮层");
       root.style.position = "absolute";
       document.body.appendChild(root);
     }
-    node.__k2ctx = { root, body };      
     const fit = (force) => scheduleFit(node, root, body, force);
     fit(false);
     requestAnimationFrame(() => fit(false));
@@ -2920,6 +2929,52 @@ let lastResizeTs = 0;
 let fitTimer = null;
 let wdTimer = null;     
 
+function k2PanelWidth(node) {
+  return Math.max(K2_MIN_PANEL_W, Math.round(Number(node?.size?.[0]) || CONFIG.width) - 20);
+}
+
+function k2Height(node) {
+  const root = node?.__k2ctx?.root;
+  if (root && root.isConnected && root.offsetWidth >= K2_MIN_PANEL_W) {
+    const h = Math.round(root.offsetHeight);
+    if (h > 40) { node.__k2StableH = h; return h; }
+  }
+  const cached = Math.round(Number(node?.__k2StableH) || 0);
+  return cached > 40 ? cached : (Math.round(panelH) || 600);
+}
+
+function k2Measure(node, root) {
+  if (!root || typeof document === "undefined" || !document.body) return 0;
+  const want = k2PanelWidth(node);
+  const prevParent = root.parentNode;
+  const prevNext = root.nextSibling;
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;left:-20000px;top:0;width:" + want + "px;visibility:hidden;pointer-events:none;";
+  root.style.width = want + "px";
+  let h = 0;
+  try {
+    probe.appendChild(root);
+    document.body.appendChild(probe);
+    h = Math.round(root.offsetHeight);
+  } catch (e) { h = 0; }
+  try {
+    if (root.parentNode === probe) {
+      probe.removeChild(root);
+      if (prevParent) prevParent.insertBefore(root, prevNext);
+    }
+    probe.remove();
+  } catch (e) { }
+  return h > 40 ? h : 0;
+}
+
+function k2LockWidth(node, root) {
+  const want = k2PanelWidth(node);
+  if (Math.round(Number.parseFloat(root.style.width) || 0) !== want) {
+    root.style.width = want + "px";
+  }
+  return root.offsetWidth >= K2_MIN_PANEL_W;
+}
+
 function contentHeight(body) {
   if (!body) return panelH;
   const h = Math.max(body.offsetHeight || 0, body.scrollHeight || 0);
@@ -2929,16 +2984,7 @@ function contentHeight(body) {
 function widgetY(node, root) {
   const dm = node?.__k2dm;
   if (dm && typeof dm.y === "number" && dm.y >= 0) return dm.y;
-  try {
-    const cv = app?.canvas, ds = cv?.ds, el = cv?.canvas;
-    if (!ds || !el || !root?.parentElement) return BOX_PAD;
-    const cr = el.getBoundingClientRect();
-    const scale = ds.scale || 1;
-    const nodeTop = cr.top + ((node.pos?.[1] || 0) + (ds.offset?.[1] || 0)) * scale;
-    const boxTop = root.parentElement.getBoundingClientRect().top;
-    const v = Math.round((boxTop - nodeTop) / scale) - BOX_PAD;
-    return v >= 0 ? v : BOX_PAD;
-  } catch (e) { return BOX_PAD; }
+  return BOX_PAD;
 }
 
 function isUserResizing(node) {
@@ -3020,7 +3066,8 @@ function relayout(node, root, body) {
   const changed = Math.abs(need - panelH) > 0.5;
   if (changed) panelH = need;
 
-  const rootH = root.offsetHeight || need;                
+  const rootH = root.offsetHeight || need;
+  node.__k2StableH = rootH;
   if (!CONFIG.autoResize) {
     if (changed) bumpCanvas(node);
     return false;
@@ -3029,6 +3076,8 @@ function relayout(node, root, body) {
   if (isDraggingNow(node)) { dbg(node, "skip: 指针按着，让位给用户拖"); return false; }
 
   clearStaleDragFlags(node);
+
+  if (!k2LockWidth(node, root)) { dbg(node, "skip: 面板宽度异常"); return false; }
 
   const wY = widgetY(node, root);
   let goal = Math.round(rootH + wY + BOX_PAD + EDGE_GAP);       
