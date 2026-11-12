@@ -116,6 +116,7 @@ class Krea2PromptPicker:
             "KOOK词库": ("BOOLEAN", {"default": False, "hidden": True}),
             "SFW词库": ("BOOLEAN", {"default": False, "hidden": True}),
             "19+词库": ("BOOLEAN", {"default": False, "hidden": True}),
+            "Krea2-Moss-Anima词库": ("BOOLEAN", {"default": False, "hidden": True}),
             "严格单图": ("BOOLEAN", {"default": True, "hidden": True}),
             "使用提示": ("STRING", {
                 "default": "提示：开关互斥，多开无效（包括中文模式）此处勿动。",
@@ -169,7 +170,8 @@ class Krea2PromptPicker:
         for tag, hzfile, label in (("大呲花词库", "part-hz1.json", "大呲花"),
                                    ("KOOK词库", "part-hz2.json", "KOOK"),
                                    ("SFW词库", "part-sfw.json", "SFW"),
-                                   ("19+词库", "part-19.json", "19+")):
+                                   ("19+词库", "part-19.json", "19+"),
+                                   ("Krea2-Moss-Anima词库", "part-moss-anima.json", "Krea2-Moss-Anima")):
             if not kw.get(tag, False):
                 continue
             pool = _pool_from_dir(ext, hzfile) or PL.load_cleaned(
@@ -240,7 +242,7 @@ def startup_check():
     for i in range(1, 14):
         if not PL.find_file("krea2", "part{:02d}.json".format(i)):
             miss.append("data\\krea2\\part{:02d}.json".format(i))
-    for hz in ("part-hz1.json", "part-hz2.json", "part-sfw.json", "part-19.json"):
+    for hz in ("part-hz1.json", "part-hz2.json", "part-sfw.json", "part-19.json", "part-moss-anima.json"):
         if not PL.find_file("krea2", hz):
             miss.append("data\\krea2\\" + hz + "（汇总词库）")
     if miss:
@@ -255,14 +257,15 @@ def startup_check():
         hz2 = PL.load_cleaned(PL.find_file("krea2", "part-hz2.json"))
         sfw = PL.load_cleaned(PL.find_file("krea2", "part-sfw.json"))
         p19 = PL.load_cleaned(PL.find_file("krea2", "part-19.json"))
+        moss = PL.load_cleaned(PL.find_file("krea2", "part-moss-anima.json"))
         cats, stats = PL.load_zimage_categories()
         extra = PL.load_extra_categories()
         split = sum(s.get("split_extra", 0) for s in stats.values())
         LOG.info("[Sunset] 词库就绪 · %s", PL.data_dir())
         LOG.info(
-            "[Sunset]   Krea2 %d 池 + NSFW %d 条 / 超强 %d 条 / 汇总 %d+%d+%d+%d 条 / "
+            "[Sunset]   Krea2 %d 池 + NSFW %d 条 / 超强 %d 条 / 汇总 %d+%d+%d+%d+%d 条（含 Moss-Anima） / "
             "Z-image %d 分类（拆粘接 +%d 条，额外分类 %d 个）",
-            len(parts), len(nsfw), super_n, len(hz1), len(hz2), len(sfw), len(p19), len(cats), split, len(extra),
+            len(parts), len(nsfw), super_n, len(hz1), len(hz2), len(sfw), len(p19), len(moss), len(cats), split, len(extra),
         )
     except Exception as e:
         LOG.warning("[Sunset] 词库统计跳过（不影响使用）：%s", e)
