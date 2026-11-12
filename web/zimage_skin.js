@@ -1,7 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
-const SKIN_VERSION = "1.1.1";
+const SKIN_VERSION = "1.1.4";
 
 const NODES = {
   ZImagePromptGeneratorNode: {
@@ -75,6 +75,8 @@ const CONFIG = {
 const WEAR_MIN_W = 400;
 const NS_MIN_W = 520;
 const LR_MIN_W = 480;
+const ZS_MIN_PANEL_W = 240;
+const ZS_FALLBACK_H = 600;
 
 const LR_GROUPS = [
   ["主题", ["画面比例", "成像媒介", "写真大类", "写真主题", "年龄阶段", "族裔大类", "地域族裔分支"]],
@@ -699,6 +701,57 @@ function widgetY(node) {
   return w ? (w.y ?? 0) : 0;
 }
 
+function zsPanelWidth(node) {
+  const cls = node?.comfyClass;
+  const minW = cls === "SunsetNSPromptSelector" ? NS_MIN_W
+    : cls === "SunsetLRPromptBuilder" ? LR_MIN_W
+      : cls === "ZImageFashionPresetLoaderNode" ? WEAR_MIN_W
+        : CONFIG.width;
+  return Math.max(ZS_MIN_PANEL_W, Math.round(Number(node?.size?.[0]) || minW) - 20);
+}
+
+function zsHeight(node) {
+  const root = node?.__zsCtx?.root;
+  if (root && root.isConnected && root.offsetWidth >= ZS_MIN_PANEL_W) {
+    const h = Math.round(root.offsetHeight);
+    if (h > 40) { node.__zsStableH = h; return h; }
+  }
+  const cached = Math.round(Number(node?.__zsStableH) || 0);
+  return cached > 40 ? cached : ZS_FALLBACK_H;
+}
+
+function zsMeasure(node, root) {
+  if (!root || typeof document === "undefined" || !document.body) return 0;
+  const want = zsPanelWidth(node);
+  const prevParent = root.parentNode;
+  const prevNext = root.nextSibling;
+  const probe = document.createElement("div");
+  probe.style.cssText = "position:fixed;left:-20000px;top:0;width:" + want + "px;visibility:hidden;pointer-events:none;";
+  root.style.width = want + "px";
+  let h = 0;
+  try {
+    probe.appendChild(root);
+    document.body.appendChild(probe);
+    h = Math.round(root.offsetHeight);
+  } catch (e) { h = 0; }
+  try {
+    if (root.parentNode === probe) {
+      probe.removeChild(root);
+      if (prevParent) prevParent.insertBefore(root, prevNext);
+    }
+    probe.remove();
+  } catch (e) { }
+  return h > 40 ? h : 0;
+}
+
+function zsLockWidth(node, root) {
+  const want = zsPanelWidth(node);
+  if (Math.round(Number.parseFloat(root.style.width) || 0) !== want) {
+    root.style.width = want + "px";
+  }
+  return root.offsetWidth >= ZS_MIN_PANEL_W;
+}
+
 function relayout(node, root) {
   if (!CONFIG.autoResize) return false;
   if (!node.graph || node.__zsGone) return false;
@@ -708,16 +761,10 @@ function relayout(node, root) {
 
   clearStaleDrag(node);
 
-  if (node.comfyClass === "SunsetNSPromptSelector") {
-    root.style.width =
-      Math.max(200, Math.round((Number(node.size?.[0]) || NS_MIN_W) - 12)) + "px";
-  }
-  if (node.comfyClass === "SunsetLRPromptBuilder") {
-    root.style.width =
-      Math.max(200, Math.round((Number(node.size?.[0]) || LR_MIN_W) - 12)) + "px";
-  }
+  if (!zsLockWidth(node, root)) { dbg(node, "skip: 面板宽度异常"); return false; }
 
   const h = root.offsetHeight;
+  node.__zsStableH = h;
   const goal = Math.round(h + widgetY(node) + CONFIG.panelPad + CONFIG.edgeGap);
   const cur = Math.round(node.size?.[1] ?? 0);
   if (Math.abs(goal - cur) <= 2) { dbg(node, `ok ${cur}`); return true; }
@@ -1564,6 +1611,7 @@ function buildWearPanel(node) {
       tags.appendChild(frag);
       chip.textContent = `44 套 · ${byStyle.size} 种风格`;
       paintPreview();
+      node.__zsRefresh?.();
     })
     .catch(() => { chip.textContent = "预设数据未加载"; });
 
@@ -2260,8 +2308,10 @@ function install(node) {
   const root = built.root || makeRoot(node);
   if (!built.root) root.appendChild(el("div", "zs-head", "面板"));
   root.appendChild(built.body);
-
   node.__zsCtx = { root, sync: built.sync, cls };
+  zsLockWidth(node, root);
+  node.__zsStableH = zsMeasure(node, root) || zsHeight(node);
+  node.__zsRefresh = () => relayout(node, root);
 
   if (!root.__zsWarmed) {
     root.__zsWarmed = true;
@@ -2331,14 +2381,15 @@ function install(node) {
     dm = node.addDOMWidget(DECK, "zimageui", root, {
       serialize: false,
       hideOnZoom: false,
-      getHeight: () => root.offsetHeight,
+      getHeight: () => zsHeight(node),
+      getMinHeight: () => zsHeight(node),
     });
     if (dm) {
-      dm.computeSize = () => [cls === "SunsetNSPromptSelector"
-        ? Math.max(Number(node.size?.[0]) || CONFIG.width, NS_MIN_W)
-        : cls === "SunsetLRPromptBuilder"
-          ? Math.max(Number(node.size?.[0]) || CONFIG.width, LR_MIN_W)
-          : CONFIG.width, root.offsetHeight];
+      dm.computeSize = () => [zsPanelWidth(node), zsHeight(node)];
+      dm.computeLayoutSize = () => ({
+        minHeight: zsHeight(node),
+        minWidth: zsPanelWidth(node),
+      });
       node.__zsDm = dm;
     }
   } else {
