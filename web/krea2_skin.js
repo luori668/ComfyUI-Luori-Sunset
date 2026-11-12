@@ -1,7 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
-const SKIN_VERSION = "3.25";
+const SKIN_VERSION = "3.26";
 
 
 const CONFIG = {
@@ -1261,7 +1261,7 @@ function buildPanel(node) {
                   "八选一：开这个会自动关掉超强中文模式、NSFW、KOOK、SFW、19+、大呲花和杂项(12 源)";
   const mossTop = el("span", "k2-toprow");
   mossTop.append(el("span", "k2-sym", "Krea2-Moss-Anima"));
-  bigMoss.append(mossTop);
+  bigMoss.append(mossTop, el("span", "k2-count", MOSS_SIZE + " 条"));
   bigMoss.onclick = () => {
     const next = !readW(node, W_NAME.moss, false);
     writeW(node, W_NAME.moss, next);
