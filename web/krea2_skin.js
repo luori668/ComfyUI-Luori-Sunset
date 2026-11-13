@@ -1,7 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
-const SKIN_VERSION = "3.30";
+const SKIN_VERSION = "3.31";
 
 
 const CONFIG = {
@@ -2935,7 +2935,7 @@ function k2PanelWidth(node) {
 
 function k2Height(node) {
   const root = node?.__k2ctx?.root;
-  if (root && root.isConnected && root.offsetWidth >= K2_MIN_PANEL_W) {
+  if (root && root.isConnected && root.offsetWidth >= K2_MIN_PANEL_W && root.offsetHeight > 40) {
     const h = Math.round(root.offsetHeight);
     if (h > 40) { node.__k2StableH = h; return h; }
   }
@@ -3061,12 +3061,13 @@ function isDraggingNow(node) {
 
 function relayout(node, root, body) {
   if (!node || !root || !body || node.__k2gone) return false;
+  if (!root.isConnected || !root.offsetWidth || !root.offsetHeight) return false;
 
   const need = contentHeight(body) + PAD_TB;              
   const changed = Math.abs(need - panelH) > 0.5;
   if (changed) panelH = need;
 
-  const rootH = root.offsetHeight || need;
+  const rootH = root.offsetHeight;
   node.__k2StableH = rootH;
   if (!CONFIG.autoResize) {
     if (changed) bumpCanvas(node);
