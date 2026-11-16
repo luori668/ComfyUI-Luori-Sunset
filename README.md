@@ -140,14 +140,14 @@
 
 ## 致谢与转载说明
 
-本仓库由 luori668 原创的部分（前端皮肤、词图库、存档节点、整合逻辑与界面,所有json词库）版权归 luori668 所有，自 v1.2.0 起采用 GPL-3.0-or-later；部分代码与词库移植自第三方项目，各自权利归原作者，授权状态见 `NOTICE`。在此一并致谢。
+除下列两个已署名并附原仓库地址的第三方项目外，本仓库其余全部内容（前端皮肤、词图库、存档节点、整合逻辑与界面,所有json词库）均为 luori668 私人所有，版权归 luori668 单独所有，自 v1.2.0 起采用 GPL-3.0-or-later；不存在其他第三方权利来源，详见 `NOTICE`。在此一并致谢。
 
 ### 落日提示词预设（SunsetLRPromptBuilder）
 
 - 原作者：VividMuse-AGI
 - 原仓库：<https://github.com/VividMuse-AGI/ComfyUI-Z-Image-Prompt-Builder>
 - 原许可证：MIT License
-- 本仓库的修改：`resolution.py` 内联为单文件；去除代码注释；词库迁移至 `data/lr/`（9 个 JSON 内容未改动）；界面重排为 8 标签分页面板；新增预设保存/恢复与运行结果回显；92 项字段默认值改为「随机抽取」。
+- 本仓库的修改：`resolution.py` 内联为单文件；去除代码注释；界面重排为 8 标签分页面板；新增预设保存/恢复与运行结果回显；92 项字段默认值改为「随机抽取」。`data/lr/` 下 9 个 JSON 词库为 luori668 私人所有，非移植自该上游项目。
 - 提示词生成逻辑未改动。`nodes_lr.py` 头部保留原始 MIT 归属声明，转载时请勿删除。
 
 ### 落日提示词选择（SunsetNSPromptSelector）

@@ -8,11 +8,13 @@ SPDX-License-Identifier: GPL-3.0-or-later
 集中声明位置。
 
 ========================================================================
-一、本仓库原创部分（Original Material）
+一、本仓库私人所有部分（Owned Material）
 ========================================================================
 
-下列由 luori668 原创编写或实质性重写的部分，版权归 luori668 所有，
-自 v1.2.0 起以 GPL-3.0-or-later 授权：
+「私人所有」指版权归 luori668 单独享有；权利人已自愿就该部分
+以 GPL-3.0-or-later 向公众授权，所有权与授权并不冲突。
+除本文件第三节列明的两个第三方项目的代码外，本仓库其余全部材料
+（含 data/ 下全部 JSON 词库文件）均属本节范围：
 
   __init__.py              节点注册与启动检查
   k2_gallery.py            词图库后端、存档与路由
@@ -24,20 +26,35 @@ SPDX-License-Identifier: GPL-3.0-or-later
   web/zimage_skin.js       五个节点的前端皮肤
   web/gallery_saver.js     存档前端桥
   web/gallery_saver_skin.js 存档节点皮肤
-  data/krea2/              自建与清洗后的 Krea2 词库
+  data/                    全部 JSON 词库文件（krea2 / lr / shared / zimage），
+                           含 data/lr/ 下 9 个 JSON，
+                           均为 luori668 私人所有
   README.md / pyproject.toml / LICENSE / NOTICE
+
+data/ 下全部词库 JSON（含 data/lr/ 下 9 个文件）均为 luori668
+私人所有，与第三节所列两个第三方项目无关，不存在其他词库素材来源、
+共同权利人或授权链例外；
+一并纳入 GPL-3.0-or-later 授权范围，受本文件第 2 节所列 GPL 第 7 条
+附加条款约束。词条多为短句与数据，依法律不强主张单条词条的著作权；
+本 NOTICE 主张的是词库文件的选择、编排与清洗所形成的整理成果。
 
 ========================================================================
 二、ADDITIONAL TERMS UNDER GNU GPL SECTION 7 (b), (c) AND (d)
 ========================================================================
 
 Pursuant to Section 7 of the GNU General Public License version 3,
-the following additional terms apply ONLY to the Original Material
-identified in section one. They do NOT apply to the third-party
-components listed in section three.
+the following additional terms apply to all material in this repository
+that is owned solely by luori668, including every dictionary JSON file
+under data/ (including the nine files under data/lr/), except for the
+two third-party code components expressly listed in section three
+together with their authors and repository addresses. All dictionary
+JSON files under data/ are owned solely by luori668 and are not part
+of either third-party project.
+"Owned Material" means the material described in section one.
+The MIT attribution notice retained in nodes_lr.py remains in force.
 
   (b) Requiring preservation of author attributions:
-      Any conveyance of the Original Material, or of any work containing
+      Any conveyance of the Owned Material, or of any work containing
       it, must preserve in a reasonably prominent manner the copyright
       notice "Copyright (C) 2026 luori668", the author attribution
       "luori668", the project name "ComfyUI-Luori-Sunset", and the
@@ -45,7 +62,7 @@ components listed in section three.
 
   (c) Prohibiting misrepresentation of origin and requiring marking of
       modified versions:
-      The origin of the Original Material must not be misrepresented.
+      The origin of the Owned Material must not be misrepresented.
       Any modified version must be marked in a reasonable way as being
       different from the original, must state that changes were made and
       the date of those changes, and must not be presented as, or named
@@ -53,12 +70,12 @@ components listed in section three.
 
   (d) Limiting use of names for publicity purposes:
       The names "luori668" and "ComfyUI-Luori-Sunset", and the names of
-      the authors of the Original Material, may not be used for
+      the authors of the Owned Material, may not be used for
       publicity purposes, nor to endorse or promote any derived work,
       without prior written permission from luori668.
 
 中文对照（解释用，英文条款为准）：
-  (b) 再分发原创部分时必须显著保留版权行、作者署名、项目名与本 NOTICE。
+  (b) 再分发私人所有部分时必须显著保留版权行、作者署名、项目名与本 NOTICE。
   (c) 不得歪曲来源；修改版必须显著标注「已修改 + 修改日期」，且不得冒称原版。
   (d) 未经 luori668 事先书面许可，不得用作者名或项目名做宣传、背书或推广衍生作品。
 
@@ -67,39 +84,43 @@ GPL-3.0 第 7 条与第 10 条将此类限制视为可被下游剥离的 further
 restrictions，故不采用。
 
 ========================================================================
-三、第三方组件与权利保留
+三、第三方项目（仅以下两项，均由仓库所有者署名并附地址）
 ========================================================================
 
 1) VividMuse-AGI - ComfyUI-Z-Image-Prompt-Builder
    项目地址: https://github.com/VividMuse-AGI/ComfyUI-Z-Image-Prompt-Builder
    原许可证: MIT License
-   对应文件: nodes_lr.py, data/lr/
-   nodes_lr.py 文件头保留原始 MIT 归属声明，转载时请勿删除。
-   MIT 条款与本仓库 GPL-3.0-or-later 兼容。
+   对应代码: nodes_lr.py（不含任何词库文件）
+   说明: data/lr/ 下 9 个 JSON 词库为 luori668 私人所有，
+         不属该上游项目，亦非其随附材料。
+   已与原作者沟通并取得使用及再发布同意；nodes_lr.py 文件头保留原始
+   MIT 归属声明，转载时请勿删除。MIT 条款与 GPL-3.0-or-later 兼容。
 
 2) weekii8282 - ComfyUI-NSFW-PromptSelector
    项目地址: https://github.com/weekii8282/ComfyUI-NSFW-PromptSelector
-   原许可证: 无。该仓库不含 LICENSE 文件，README 亦无任何授权声明。
-   对应文件: nodes_nsfw.py, data/shared/luori.json 及配套词库
-   说明: 该组件的全部权利归原作者 weekii8282 所有。本仓库未取得
-   再授权，因此不对该组件授予 GPL-3.0 或任何其他许可；上述第 7 条
-   附加条款不适用于该组件。使用者若需再分发或商用该组件，应自行
-   向原作者取得授权。本仓库 README 中「核心逻辑未改动」的陈述如实
-   保留；如原作者提出调整或移除，本仓库将第一时间处理。
+   原仓库状态: 不含 LICENSE 文件。
+   对应代码: nodes_nsfw.py（不含任何词库文件）
+   已与原作者沟通并取得使用及再发布同意，该组件一并纳入本仓库
+   GPL-3.0-or-later 授权范围，第 7 条附加条款同样适用。
+   README 中「核心逻辑未改动」的陈述如实保留；如原作者提出调整
+   或移除，本仓库将第一时间处理。
 
-3) 社区公开词库（大呲花 / KOOK 等）
-   仅做格式转换与清洗，词条权利归原整理者；本仓库不对短句词条
-   主张著作权。感谢原作者。
+3) 其余全部材料
+   除上述两项代码外，本仓库其余全部内容（含 data/ 下全部 JSON 词库、
+   前端皮肤、词图库、存档节点、整合逻辑与文档）均为
+   luori668 私人所有，不存在任何第三方素材来源、共同权利人或
+   授权链例外。README 中「感谢，大呲花 / KOOK 的大力支持」仅为
+   致谢，不构成权利归属或素材来源的声明。
 
-4) ComfyUI 本体
-   ComfyUI 采用 GPL-3.0，本仓库作为独立 custom node 分发，不复制
-   其源码。仓库地址: https://github.com/comfyanonymous/ComfyUI
+4) 运行依赖（非本仓库组成部分，不涉及本仓库材料归属）
+   ComfyUI 本体采用 GPL-3.0，本仓库作为独立 custom node 分发，
+   不复制其源码。仓库地址: https://github.com/comfyanonymous/ComfyUI
 
 ========================================================================
 四、版本划线
 ========================================================================
 
 v1.2.0 及之后: GPL-3.0-or-later + 本 NOTICE 中的第 7 条附加条款。
-v1.1.0 及之前: Apache-2.0。依 Apache-2.0 第 2 条，该授永久且不可撤销，
+v1.1.0 及之前: Apache-2.0。依 Apache-2.0 第 2 条，该授权永久且不可撤销，
 历史版本及其快照继续适用原条款，本 NOTICE 不改变其授权状态。
 划线 tag: v1.1.0-apache
