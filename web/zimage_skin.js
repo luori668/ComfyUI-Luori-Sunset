@@ -40,16 +40,19 @@ const CAT_COLOR = {
   "糖水少女": "#FF7A9C",
   "NSFW": "#FF3D71",
   "抽卡": "#F59E0B",
+  "bdz": "#EAB308",
   "随机模式": "#22D3EE",
 };
+const CAT_LABEL = { "bdz": "宝丹宗宗主" };
 const EXTRA_PALETTE = ["#10B981", "#06B6D4", "#6366F1", "#D946EF", "#F43F5E",
                        "#84CC16", "#0891B2", "#7C3AED", "#EA580C", "#0EA5E9"];
 
-const NOT_CATEGORY = ["超强模式", "随机模式", "触发词开关"];
+const NOT_CATEGORY = ["超强模式", "随机模式", "触发词开关", "control_after_generate"];
 
 const CAT_SIZE = {
   "古装": 70, "古风": 159, "艺术摄影": 73, "cos": 106,
   "糖水少女": 106, "NSFW": 73, "抽卡": 112,
+  "bdz": 1128,
 };
 
 const STYLE_TAG_COLOR = {
@@ -255,6 +258,12 @@ const zsAutoSave = () => {
     if (!pid || !zsPend) return;
     const job = zsPend;
     zsPend = null;
+    let autoOn = true;
+    try {
+      const v = localStorage.getItem("luori_autosave");
+      if (v === "0" || v === "1") autoOn = v === "1";
+    } catch (e) { }
+    if (!autoOn) return;
     if (job.at && Date.now() - job.at > 600000) return;
     try {
       const res = await api.fetchApi("/luori/k2/gallery", {
@@ -1002,10 +1011,11 @@ function makeCatTile(node, wname, color, symbol, count, extraCls, pick) {
   b.type = "button";
   b.style.setProperty("--c", color);
   b.__wname = wname;
+  const label = CAT_LABEL[wname] || wname;
   b.appendChild(el("span", "zs-sym", symbol || "·"));
-  b.appendChild(el("span", "zs-nm", wname));
+  b.appendChild(el("span", "zs-nm", label));
   if (count) b.appendChild(el("span", "zs-n", String(count)));
-  b.title = `${wname}${count ? ` · ${count} 条` : ""}\n点它就选它，其它分类自动关掉`;
+  b.title = `${label}${count ? ` · ${count} 条` : ""}\n点它就选它，其它分类自动关掉`;
   const paint = () => b.classList.toggle("on", !!readW(node, wname, false));
   b.addEventListener("click", () => {
     if (typeof pick === "function") pick(wname);
@@ -1337,7 +1347,7 @@ function buildDrawerPanel(node) {
       extraIdx++;
     }
     const sym = { "古装": "古", "古风": "风", "艺术摄影": "艺", "cos": "C",
-      "糖水少女": "糖", "NSFW": "18", "抽卡": "抽" }[name] || name.slice(0, 1);
+      "糖水少女": "糖", "NSFW": "18", "抽卡": "抽", "bdz": "丹" }[name] || name.slice(0, 1);
     const count = CAT_SIZE[name];
     const tile = makeCatTile(node, name, color, sym, count,
       (isAurora ? "zs-wide zs-aurora" : "") + (isDanger ? " zs-danger" : ""), pick);
@@ -1370,8 +1380,9 @@ function buildDrawerPanel(node) {
     mega.__paint();
     const act = [mega.__wname, ...refs.tiles.map((t) => t.__wname)]
       .filter((n) => !!readW(node, n, false));
+    const actLabel = CAT_LABEL[act[0]] || act[0];
     chip.textContent = act.length
-      ? (act.length > 1 ? `${act[0]} +${act.length - 1}` : act[0])
+      ? (act.length > 1 ? `${actLabel} +${act.length - 1}` : actLabel)
       : "未选择";
     chip.className = "zs-chip" + (act.length ? " hot" : " zero");
     refs.seed.__paint();

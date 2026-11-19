@@ -253,7 +253,10 @@ const k2gHook = () => {
       const target = k2gFind(nodeId);
       if (!target) continue;
       const props = target.properties || {};
-      const autoOn = typeof props.__k2AutoSave === "boolean" ? props.__k2AutoSave : true;
+      const autoStored = storeGet("luori_autosave", "");
+      const autoOn = autoStored === "0" || autoStored === "1"
+        ? autoStored === "1"
+        : (typeof props.__k2AutoSave === "boolean" ? props.__k2AutoSave : true);
       if (!autoOn) continue;
       try {
         await api.fetchApi("/luori/k2/gallery", {
@@ -1498,8 +1501,8 @@ function buildPanel(node) {
   const segAuto = el("div", "k2-seg");
   const auOn = el("button", null, "开启");
   const auOff = el("button", null, "关闭");
-  auOn.onclick = () => { if (!node.properties) node.properties = {}; node.properties.__k2AutoSave = true; paintAdv(); };
-  auOff.onclick = () => { if (!node.properties) node.properties = {}; node.properties.__k2AutoSave = false; paintAdv(); };
+  auOn.onclick = () => { if (!node.properties) node.properties = {}; node.properties.__k2AutoSave = true; storeSet("luori_autosave", "1"); paintAdv(); };
+  auOff.onclick = () => { if (!node.properties) node.properties = {}; node.properties.__k2AutoSave = false; storeSet("luori_autosave", "0"); paintAdv(); };
   segAuto.append(auOn, auOff);
   fAuto.appendChild(segAuto);
   advBody.appendChild(fAuto);
@@ -1509,7 +1512,16 @@ function buildPanel(node) {
     stOn.classList.toggle("on", !!strict);
     stOff.classList.toggle("on", !strict);
     const props = node.properties || {};
-    const auto = typeof props.__k2AutoSave === "boolean" ? props.__k2AutoSave : true;
+    const autoStored = storeGet("luori_autosave", "");
+    let auto;
+    if (autoStored === "0" || autoStored === "1") {
+      auto = autoStored === "1";
+    } else if (typeof props.__k2AutoSave === "boolean") {
+      auto = props.__k2AutoSave;
+      storeSet("luori_autosave", auto ? "1" : "0");
+    } else {
+      auto = true;
+    }
     auOn.classList.toggle("on", auto);
     auOff.classList.toggle("on", !auto);
   }
