@@ -2017,6 +2017,62 @@ function makeLRNum(node, wname, label, min, max, step) {
   return wrap;
 }
 
+function makeLRSeedLock(node) {
+  const btn = el("button");
+  btn.type = "button";
+  Object.assign(btn.style, {
+    flex: "0 0 auto", height: "30px", padding: "0 7px", borderRadius: "8px",
+    cursor: "pointer", fontSize: "9.5px", whiteSpace: "nowrap", transition: "filter .15s"
+  });
+  const ctrlOf = () => (node.widgets || []).find((w) => w.name === "control_after_generate") || null;
+  const isFixed = () => {
+    const c = ctrlOf();
+    if (c) return c.value === "fixed";
+    return (Number(readW(node, "随机种子", 0)) || 0) > 0;
+  };
+  const setFixed = (on) => {
+    const c = ctrlOf();
+    if (c) {
+      const v = on ? "fixed" : "randomize";
+      if (c.value !== v) {
+        c.value = v;
+        try { c.callback?.(v, app.canvas, node); } catch (_) { }
+      }
+      return;
+    }
+    const cur = Number(readW(node, "随机种子", 0)) || 0;
+    writeW(node, "随机种子", on ? (cur || Math.floor(Math.random() * 4294967295)) : 0);
+  };
+  const stop = (e) => {
+    if (!e) return;
+    try { e.preventDefault(); } catch (_) { }
+    try { e.stopPropagation(); } catch (_) { }
+    try { e.stopImmediatePropagation && e.stopImmediatePropagation(); } catch (_) { }
+  };
+  btn.addEventListener("pointerdown", stop, true);
+  btn.addEventListener("mousedown", stop, true);
+  btn.addEventListener("click", (e) => {
+    stop(e);
+    setFixed(!isFixed());
+    paint();
+    try { node.__zsCtx?.sync?.(); } catch (_) { }
+  });
+  const paint = () => {
+    const fixed = isFixed();
+    const v = Number(readW(node, "随机种子", 0)) || 0;
+    btn.textContent = fixed ? "已固定" : "随机中";
+    btn.style.color = fixed ? "#FFD08A" : "#B9A7E0";
+    btn.style.borderColor = fixed ? "rgba(255,208,138,.45)" : "rgba(255,255,255,.16)";
+    btn.style.background = fixed ? "rgba(255,208,138,.10)" : "rgba(255,255,255,.05)";
+    btn.title = fixed
+      ? `已锁定：每次运行都用种子 ${v}\n点一下切回随机（每次运行自动换）`
+      : `随机中：每次运行自动换种子\n点一下锁定当前值 ${v}`;
+  };
+  paint();
+  btn.__paint = paint;
+  return btn;
+}
+
 function ensureLRWidth(node) {
   if (node?.comfyClass !== "SunsetLRPromptBuilder") return;
   if (!CONFIG.autoResize) return;
@@ -2168,7 +2224,8 @@ function buildLRPanel(node) {
   const topRow = el("div", "zs-four");
   topRow.appendChild(makeSelect(node, "提示词密度", "密度"));
   topRow.appendChild(makeSelect(node, "随机范围", "范围"));
-  topRow.appendChild(makeLRNum(node, "随机种子", "种子", 0, 18446744073709551615, 1));
+  const seedField = makeLRNum(node, "随机种子", "种子", 0, 18446744073709551615, 1);
+  topRow.appendChild(seedField);
   const roll = el("button", "zs-btn", "随机");
   roll.type = "button";
   roll.title = "换一个随机种子，下一次运行用新种子重新抽";
@@ -2177,6 +2234,9 @@ function buildLRPanel(node) {
     node.__zsCtx?.sync?.();
   });
   topRow.appendChild(roll);
+  const seedLock = makeLRSeedLock(node);
+  topRow.appendChild(seedLock);
+  refs.seedLock = seedLock;
   gTop.appendChild(topRow);
   gTop.appendChild(buildLRPresetBar(node));
   const modeRow = el("div");
@@ -2281,6 +2341,9 @@ function buildLRPanel(node) {
     }
     for (const t of refs.texts) {
       try { t.__paint?.(); } catch (e) {  }
+    }
+    if (refs.seedLock) {
+      try { refs.seedLock.__paint?.(); } catch (e) {  }
     }
     const o = node.__zsLROut;
     if (o) {
